@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Price Buddy v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; min-height: 100vh; display: flex; gap: 0; }
+
+/* Sidebar */
+.sidebar { width: 240px; background: #fff; border-right: 0.5px solid #e5e5e5; display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-head { padding: 1rem 1.25rem; border-bottom: 0.5px solid #e8e8e8; }
+.sidebar-logo { font-size: 16px; font-weight: 700; color: #111; display: flex; align-items: center; gap: 8px; }
+.sidebar-logo i { color: #185fa5; }
+.sidebar-tagline { font-size: 11px; color: #aaa; margin-top: 2px; }
+.sidebar-section { padding: 0.75rem 1rem 0.5rem; font-size: 11px; font-weight: 600; color: #bbb; letter-spacing: 0.06em; text-transform: uppercase; }
+.session-item { padding: 8px 1rem; cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
+.session-item:hover { background: #f7f7f5; border-left-color: #c5d9ef; }
+.session-item.active { background: #eef3fb; border-left-color: #185fa5; }
+.session-name { font-size: 13px; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+.new-chat-btn { margin: 0.75rem 1rem; padding: 9px 12px; border: 0.5px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; color: #555; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.new-chat-btn:hover { background: #f0f0f0; }
+.sidebar-empty { font-size: 12px; color: #ccc; padding: 0.5rem 1rem; font-style: italic; }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { padding: 0.875rem 1.5rem; background: #fff; border-bottom: 0.5px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; }
+.topbar-title { font-size: 15px; font-weight: 600; color: #111; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 5px; }
+.status-dot.online { background: #1d9e75; }
+.status-text { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+
+/* Chat area */
+.chat-area { flex: 1; display: flex; overflow: hidden; }
+.messages-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.msgs { flex: 1; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.msg.user { flex-direction: row-reverse; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
+.msg.assistant .avatar { background: #eef3fb; color: #185fa5; border: 0.5px solid #c5d9ef; }
+.msg.user .avatar { background: #185fa5; color: #fff; font-size: 10px; }
+.bubble { padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.6; max-width: 75%; }
+.msg.assistant .bubble { background: #fff; color: #111; border: 0.5px solid #e5e5e5; }
+.msg.user .bubble { background: #185fa5; color: #fff; }
+.typing { display: flex; gap: 4px; align-items: center; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #aaa; animation: blink 1.2s infinite; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+/* Results panel */
+.results-panel { width: 320px; border-left: 0.5px solid #e8e8e8; background: #fafafa; overflow-y: auto; flex-shrink: 0; padding: 1rem; display: flex; flex-direction: column; gap: 10px; }
+.panel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: #ccc; font-size: 13px; text-align: center; padding: 2rem; }
+.panel-empty i { font-size: 40px; }
+.card { background: #fff; border: 0.5px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
+.card-title { font-size: 11px; font-weight: 600; color: #888; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+.card-title i { font-size: 14px; }
+.brow { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 0.5px solid #f2f2f2; color: #666; }
+.brow:last-child { border: none; }
+.brow.total { font-size: 13.5px; font-weight: 600; color: #111; border-top: 1px solid #e8e8e8; margin-top: 4px; padding-top: 6px; }
+.brow .val { color: #111; font-weight: 500; }
+.brow.loss .val { color: #a32d2d; font-weight: 600; }
+.brow.profit .val { color: #0f6e56; font-weight: 600; }
+.tiers { display: flex; flex-direction: column; gap: 6px; }
+.tier { border: 0.5px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; }
+.tier.rec { border: 2px solid #185fa5; background: #f7fbff; }
+.tier-left { display: flex; flex-direction: column; gap: 2px; }
+.tier-label { font-size: 12px; font-weight: 600; color: #111; display: flex; align-items: center; gap: 6px; }
+.tier-badge { font-size: 9px; background: #eef3fb; color: #185fa5; padding: 2px 6px; border-radius: 100px; font-weight: 600; }
+.tier-note { font-size: 11px; color: #888; }
+.tier-price { font-size: 20px; font-weight: 700; color: #111; }
+.mbar-row { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 6px; }
+.mbar-label { width: 45px; color: #888; text-align: right; flex-shrink: 0; }
+.mbar-track { flex: 1; height: 7px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+.mbar-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
+.mbar-val { width: 45px; color: #111; font-weight: 500; font-size: 12px; }
+.market-note { font-size: 11px; color: #aaa; margin-top: 6px; }
+.your-pos { font-size: 12px; color: #555; margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; }
+.your-dot { width: 7px; height: 7px; border-radius: 50%; background: #e24b4a; flex-shrink: 0; margin-top: 4px; }
+.conf-bar { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+.conf-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
+.conf-text { font-size: 11px; color: #888; }
+.reasoning { font-size: 12px; color: #666; line-height: 1.5; font-style: italic; background: #f9f9f7; border-radius: 6px; padding: 8px; }
+.missing { display: flex; flex-direction: column; gap: 4px; }
+.missing-item { font-size: 12px; color: #885f0b; display: flex; align-items: flex-start; gap: 5px; }
+.missing-item i { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+.sources { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.source-link { font-size: 11px; color: #185fa5; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-link:hover { text-decoration: underline; }
+
+/* Input */
+.input-area { padding: 0.75rem 1.5rem 1rem; border-top: 0.5px solid #e8e8e8; background: #fff; display: flex; gap: 8px; align-items: flex-end; }
+textarea { flex: 1; font-size: 14px; font-family: inherit; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; resize: none; min-height: 44px; max-height: 120px; line-height: 1.5; color: #111; background: #fafafa; outline: none; }
+textarea:focus { border-color: #185fa5; background: #fff; }
+.send-btn { width: 44px; height: 44px; border-radius: 10px; border: none; background: #185fa5; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; flex-shrink: 0; transition: opacity 0.15s; }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-btn:not(:disabled):hover { background: #0c447c; }
+
+/* Pills */
+.pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0.75rem 1.5rem; background: #fff; border-bottom: 0.5px solid #f2f2f2; }
+.pill { font-size: 12px; padding: 5px 12px; border-radius: 100px; border: 0.5px solid #ccc; color: #555; cursor: pointer; background: #f9f9f9; transition: all 0.15s; }
+.pill:hover { background: #eef3fb; border-color: #185fa5; color: #185fa5; }
+.hidden { display: none !important; }
+
+@media (max-width: 800px) {
+  .sidebar { display: none; }
+  .results-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-head">
+    <div class="sidebar-logo"><i class="ti ti-tag"></i> Price Buddy</div>
+    <div class="sidebar-tagline">Artisan pricing assistant</div>
+  </div>
+  <button class="new-chat-btn" onclick="newSession()">
+    <i class="ti ti-plus" style="font-size:15px"></i> New analysis
+  </button>
+  <div class="sidebar-section">Recent</div>
+  <div id="session-list"><div class="sidebar-empty">No sessions yet</div></div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="chat-title">New analysis</div>
+    <div class="status-text"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking Ollama…</span></div>
+  </div>
+
+  <div class="chat-area">
+    <div class="messages-col">
+      <div class="pills" id="pills">
+        <span class="pill" onclick="usePill(this)">Clay diyas, ₹120 materials, 10 pieces, 2 hrs</span>
+        <span class="pill" onclick="usePill(this)">Crochet teddy bear, ~5 hrs, no packaging</span>
+        <span class="pill" onclick="usePill(this)">Hand-printed tote bags, ₹80/bag materials</span>
+        <span class="pill" onclick="usePill(this)">Macrame wall hanging, 4 hrs, ₹200 materials</span>
+      </div>
+
+      <div class="msgs" id="msgs">
+        <div class="msg assistant">
+          <div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div>
+          <div class="bubble">Namaste! Describe your handmade product — what you make, roughly what materials cost, and how long it takes. I'll calculate a fair price and explain every number clearly.</div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea id="inp" rows="1" placeholder="Describe your product…" oninput="autosize(this)" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="sbtn" onclick="send()" aria-label="Send"><i class="ti ti-send"></i></button>
+      </div>
+    </div>
+
+    <!-- Results panel -->
+    <div class="results-panel" id="results-panel">
+      <div class="panel-empty" id="panel-empty">
+        <i class="ti ti-calculator"></i>
+        <span>Your pricing breakdown will appear here after analysis</span>
+      </div>
+      <div id="panel-cards" class="hidden"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8080";
+let sessionId = null;
+let busy = false;
+
+async function checkHealth() {
+  try {
+    const r = await fetch(API + "/health");
+    if (r.ok) {
+      document.getElementById("status-dot").classList.add("online");
+      document.getElementById("status-text").textContent = "Backend ready";
+    } else throw new Error();
+  } catch {
+    document.getElementById("status-text").textContent = "Backend offline";
+  }
+}
+
+async function loadSessions() {
+  try {
+    const r = await fetch(API + "/history");
+    const sessions = await r.json();
+    const list = document.getElementById("session-list");
+    if (!sessions.length) { list.innerHTML = '<div class="sidebar-empty">No sessions yet</div>'; return; }
+    list.innerHTML = sessions.map(s => `
+      <div class="session-item ${s.id === sessionId ? 'active' : ''}" onclick="loadSession('${s.id}', '${(s.product_type||'Session').replace(/'/g,"\\'")}')">
+        <div class="session-name">${s.product_type || "Unnamed product"}</div>
+        <div class="session-meta">${s.msg_count} messages · ${s.created_at.slice(0,10)}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function loadSession(id, name) {
+  sessionId = id;
+  document.getElementById("chat-title").textContent = name;
+  document.querySelectorAll(".session-item").forEach(el => el.classList.remove("active"));
+  event.currentTarget?.classList.add("active");
+  const msgs = document.getElementById("msgs");
+  msgs.innerHTML = '';
+  try {
+    const r = await fetch(`${API}/history/${id}`);
+    const messages = await r.json();
+    messages.forEach(m => addMsg(m.role, m.content));
+  } catch(e) {}
+}
+
+function newSession() {
+  sessionId = null;
+  document.getElementById("chat-title").textContent = "New analysis";
+  document.getElementById("msgs").innerHTML = `<div class="msg assistant"><div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div><div class="bubble">Namaste! Describe your handmade product — what you make, roughly what materials cost, and how long it takes. I'll calculate a fair price and explain every number clearly.</div></div>`;
+  document.getElementById("pills").classList.remove("hidden");
+  document.getElementById("panel-empty").classList.remove("hidden");
+  document.getElementById("panel-cards").classList.add("hidden");
+  document.getElementById("panel-cards").innerHTML = "";
+}
+
+function usePill(el) {
+  document.getElementById("inp").value = el.textContent;
+  document.getElementById("pills").classList.add("hidden");
+  send();
+}
+
+function autosize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+function addMsg(role, html) {
+  const msgs = document.getElementById("msgs");
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  const av = role === "assistant"
+    ? '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div>'
+    : '<div class="avatar">You</div>';
+  d.innerHTML = av + `<div class="bubble">${html}</div>`;
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById("msgs");
+  const d = document.createElement("div");
+  d.id = "typing"; d.className = "msg assistant";
+  d.innerHTML = '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div><div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>';
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() { const t = document.getElementById("typing"); if (t) t.remove(); }
+
+function renderPanel(d) {
+  const market = d.market || {};
+  const costs = d.costs || {};
+  const costItems = [
+    ["Materials", costs.materials],
+    ["Labor", costs.labor],
+    ["Packaging", costs.packaging],
+    ["Transport", costs.transport],
+    ["Marketplace fee (8%)", costs.marketplace_fee],
+    ["Waste allowance (10%)", costs.waste_allowance],
+  ];
+
+  let costHtml = costItems
+    .filter(([,v]) => v != null)
+    .map(([k,v]) => `<div class="brow"><span>${k}</span><span class="val">₹${v}</span></div>`).join("");
+  costHtml += `<div class="brow total"><span>Floor price</span><span class="val">₹${d.floor_price}</span></div>`;
+  if (d.user_planned_price) {
+    const diff = d.user_planned_price - d.floor_price;
+    costHtml += `<div class="brow ${diff < 0 ? 'loss' : 'profit'}"><span>Your planned price</span><span class="val">₹${d.user_planned_price} (${diff < 0 ? '−₹'+Math.abs(diff)+' loss' : '+₹'+diff})</span></div>`;
+  }
+
+  const tierValues = Object.values(d.tiers || {});
+  const tiersHtml = tierValues.map((t, i) => `
+    <div class="tier${i===1?' rec':''}">
+      <div class="tier-left">
+        <div class="tier-label">${t.label}${i===1?' <span class="tier-badge">Recommended</span>':''}</div>
+        <div class="tier-note">${t.note}</div>
+      </div>
+      <div class="tier-price">₹${t.price}</div>
+    </div>`).join("");
+
+  // ── Market card ───────────────────────────────────────────────────────────
+  const hasMarketPrices = market.market_min != null;
+  const maxV = market.market_max || 1;
+  const std = tierValues[1]?.price || 0;
+
+  let mktHtml = "";
+  if (hasMarketPrices) {
+    const bars = [
+      ["Min", market.market_min, "#9fe1cb"],
+      ["Avg", market.market_avg, "#1d9e75"],
+      ["Max", market.market_max, "#085041"]
+    ];
+    mktHtml += bars.map(([l,v,c]) =>
+      `<div class="mbar-row"><div class="mbar-label">${l}</div><div class="mbar-track"><div class="mbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${c}"></div></div><div class="mbar-val">₹${v}</div></div>`
+    ).join("");
+    const pos = std < market.market_min ? `Your standard price ₹${std} is below market min — you can charge more`
+      : std < market.market_avg ? `Your standard price ₹${std} is below market average — good value positioning`
+      : std <= market.market_max ? `Your standard price ₹${std} is in the mid-to-premium range`
+      : `Your standard price ₹${std} is above market max — justify with quality`;
+    mktHtml += `<div class="your-pos"><div class="your-dot"></div><span>${pos}</span></div>`;
+  } else {
+    mktHtml += `<div style="font-size:12px;color:#aaa;font-style:italic">No prices found in this scrape — DuckDuckGo may have rate-limited the request. Results are cached for 6hrs.</div>`;
+  }
+
+  // Scrape stats row — always show
+  const sampleCount = market.sample_count || 0;
+  const sources = market.sources || [];
+  const fromCache = market.from_cache ? " (cached)" : "";
+  mktHtml += `
+    <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid #f0f0f0">
+      <div style="font-size:11px;color:#888;margin-bottom:5px">
+        <i class="ti ti-database" style="font-size:12px"></i>
+        Scraped <strong>${sampleCount}</strong> prices from <strong>${sources.length}</strong> sites${fromCache}
+      </div>
+      ${sources.length ? sources.slice(0,5).map(s => {
+        let host = s;
+        try { host = new URL(s).hostname.replace("www.",""); } catch(e) {}
+        return `<a class="source-link" href="${s}" target="_blank" rel="noopener">↗ ${host}</a>`;
+      }).join("") : '<span style="font-size:11px;color:#ccc">No sources</span>'}
+    </div>
+  `;
+
+  // ── Confidence + missing info ──────────────────────────────────────────────
+  const conf = Math.round((d.confidence||0.5) * 100);
+  const confColor = conf >= 75 ? "#1d9e75" : conf >= 55 ? "#ba7517" : "#e24b4a";
+
+  const missingHtml = (d.missing_info||[]).length
+    ? `<div class="card"><div class="card-title"><i class="ti ti-info-circle" style="color:#ba7517"></i> To improve accuracy</div><div class="missing">${d.missing_info.map(m=>`<div class="missing-item"><i class="ti ti-point" style="color:#ba7517"></i>${m}</div>`).join("")}</div></div>`
+    : "";
+
+  // ── RAG card ──────────────────────────────────────────────────────────────
+  const ragProducts = d.retrieved_products || [];
+  const ragHtml = ragProducts.length ? `
+    <div class="card">
+      <div class="card-title"><i class="ti ti-books"></i> Similar products used for pricing</div>
+      ${ragProducts.slice(0,3).map(p => `
+        <div class="brow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0">
+          <span style="font-size:12px;color:#111">${p.description}</span>
+          <span style="font-size:11px;color:#888">₹${p.selling_price} · ${p.complexity} · ${p.experience_level} · similarity ${Math.round(p.similarity_score*100)}%</span>
+        </div>`).join("")}
+    </div>` : "";
+
+  document.getElementById("panel-empty").classList.add("hidden");
+  const pc = document.getElementById("panel-cards");
+  pc.classList.remove("hidden");
+  pc.innerHTML = `
+    <div class="card"><div class="card-title"><i class="ti ti-calculator"></i> Cost breakdown</div>${costHtml}</div>
+    <div class="card"><div class="card-title"><i class="ti ti-layers"></i> Pricing tiers</div><div class="tiers">${tiersHtml}</div></div>
+    <div class="card"><div class="card-title"><i class="ti ti-chart-bar"></i> Market research</div>${mktHtml}</div>
+    <div class="card"><div class="card-title"><i class="ti ti-shield-check"></i> Confidence</div><div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div><div class="conf-text">${conf}% — ${d.labor_reasoning||""}</div></div>
+    ${missingHtml}
+    ${ragHtml}
+  `;
+}
+
+async function send() {
+  if (busy) return;
+  const inp = document.getElementById("inp");
+  const text = inp.value.trim();
+  if (!text) return;
+
+  busy = true;
+  document.getElementById("sbtn").disabled = true;
+  document.getElementById("pills").classList.add("hidden");
+  inp.value = ""; inp.style.height = "auto";
+  addMsg("user", text);
+  showTyping();
+
+  try {
+    // First message in session → /analyze (full pipeline)
+    // Follow-up in existing session → /chat (conversational)
+    const isFollowUp = sessionId !== null;
+    const endpoint = isFollowUp ? "/chat" : "/analyze";
+    const body = isFollowUp
+      ? { message: text, session_id: sessionId }
+      : { description: text, session_id: sessionId };
+
+    const r = await fetch(API + endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    removeTyping();
+
+    if (!r.ok) {
+      const err = await r.json();
+      addMsg("assistant", `Error: ${err.detail || "Something went wrong. Is Ollama running?"}`);
+    } else {
+      const data = await r.json();
+      sessionId = data.session_id;
+
+      if (endpoint === "/analyze") {
+        // Full analysis — render everything
+        document.getElementById("chat-title").textContent = data.product_type || "Analysis";
+        addMsg("assistant", data.chat_reply);
+        renderPanel(data);
+        loadSessions();
+      } else {
+        // Conversational follow-up
+        addMsg("assistant", data.reply);
+        // If backend re-analysed with new data, update the panel too
+        if (data.type === "reanalysis" && data.data) {
+          renderPanel(data.data);
+        }
+      }
+    }
+  } catch(e) {
+    removeTyping();
+    addMsg("assistant", "Cannot reach the backend. Make sure FastAPI is running on port 8080.");
+  }
+
+  busy = false;
+  document.getElementById("sbtn").disabled = false;
+}
+
+checkHealth();
+loadSessions();
+setInterval(loadSessions, 30000);
+</script>
+</body>
+</html>
