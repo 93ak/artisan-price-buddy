@@ -130,3 +130,48 @@ def set_market_cache(query: str, result: dict):
     )
     conn.commit()
     conn.close()
+
+# ── Cross-session context ──────────────────────────────────────────────────────
+
+def get_recent_analyses(limit: int = 3) -> list[dict]:
+    """
+    Fetch the last N analyses across ALL sessions.
+    Used to build cross-session context for the LLM.
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT product_type, costs, floor_price, tiers, confidence, created_at "
+        "FROM analyses ORDER BY created_at DESC LIMIT ?",
+        (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def build_cross_session_context(limit: int = 3) -> str:
+    """
+    Build a compact summary of recent past analyses to inject as context.
+    Helps the LLM be consistent and refer to prior products if relevant.
+    """
+    analyses = get_recent_analyses(limit)
+    if not analyses:
+        return ""
+
+    lines = ["User's recent pricing history (for context only, do not repeat unless relevant):"]
+    for a in analyses:
+        try:
+            costs = json.loads(a["costs"]) if a["costs"] else {}
+            tiers = json.loads(a["tiers"]) if a["tiers"] else {}
+            std_price = tiers.get("standard", {}).get("price", "?")
+            mat = costs.get("materials", "?")
+            lab = costs.get("labor", "?")
+            lines.append(
+                f"- {a['product_type'] or 'Unknown'}: "
+                f"materials ₹{mat}, labor ₹{lab}, "
+                f"floor ₹{a['floor_price']}, recommended ₹{std_price} "
+                f"({a['created_at'][:10]})"
+            )
+        except Exception:
+            continue
+
+    return "\n".join(lines)

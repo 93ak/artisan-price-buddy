@@ -2,6 +2,9 @@
 
 AI-powered pricing assistant for artisans. Uses Ollama (Llama 3.1 8B) locally + real web scraping for market research.
 
+cd backend
+.\venv\Scripts\Activate
+uvicorn main:app --reload --port 8080
 ## Folder structure
 
 ```
@@ -42,7 +45,7 @@ ollama serve
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+.\venv\Scripts\Activate.ps1      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```

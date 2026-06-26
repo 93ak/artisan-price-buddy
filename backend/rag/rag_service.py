@@ -1,25 +1,41 @@
 """
-RAG service using ChromaDB + nomic-embed-text via Ollama.
-nomic-embed-text must be pulled: ollama pull nomic-embed-text
+RAG service using ChromaDB + sentence-transformers (local, CPU, no Ollama needed).
+Model: all-MiniLM-L6-v2 (~90MB, downloads once on first run)
 """
-import httpx
 import json
 import logging
 from pathlib import Path
 from typing import Optional
 import chromadb
 from chromadb.config import Settings
+from sentence_transformers import SentenceTransformer
 from rag.dataset import ARTISAN_PRODUCTS
 
 logger = logging.getLogger("uvicorn.error")
 
-OLLAMA_URL = "http://localhost:11434"
-EMBED_MODEL = "nomic-embed-text"
 CHROMA_PATH = Path(__file__).parent.parent / "chroma_db"
-COLLECTION_NAME = "artisan_products_v1"
+COLLECTION_NAME = "artisan_products_v2"
+EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
 
 _client = None
 _collection = None
+_embedder: Optional[SentenceTransformer] = None
+
+
+def get_embedder() -> SentenceTransformer:
+    global _embedder
+    if _embedder is None:
+        logger.info("RAG: Loading sentence-transformers model (first run may download ~90MB)...")
+        _embedder = SentenceTransformer(EMBED_MODEL_NAME)
+        logger.info("RAG: Embedder ready.")
+    return _embedder
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    """Synchronous local embedding — fast enough to not need async."""
+    model = get_embedder()
+    return model.encode(texts, show_progress_bar=False).tolist()
+
 
 def get_client():
     global _client
@@ -30,29 +46,17 @@ def get_client():
         )
     return _client
 
+
 def get_collection():
     global _collection
     if _collection is None:
-        # embedding_function=None because we supply our own via Ollama
         _collection = get_client().get_or_create_collection(
             name=COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"},
-            embedding_function=None
+            embedding_function=None  # we supply our own
         )
     return _collection
 
-async def embed(texts: list[str]) -> list[list[float]]:
-    """Get embeddings from Ollama nomic-embed-text."""
-    embeddings = []
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        for text in texts:
-            resp = await client.post(
-                f"{OLLAMA_URL}/api/embeddings",
-                json={"model": EMBED_MODEL, "prompt": text}
-            )
-            resp.raise_for_status()
-            embeddings.append(resp.json()["embedding"])
-    return embeddings
 
 def _product_to_text(p: dict) -> str:
     return (
@@ -63,6 +67,7 @@ def _product_to_text(p: dict) -> str:
         f"Tags: {', '.join(p['tags'])}."
     )
 
+
 async def index_dataset(force: bool = False) -> dict:
     collection = get_collection()
     existing = collection.count()
@@ -71,7 +76,7 @@ async def index_dataset(force: bool = False) -> dict:
         logger.info(f"RAG: Already indexed {existing} products, skipping.")
         return {"status": "skipped", "count": existing}
 
-    logger.info(f"RAG: Embedding {len(ARTISAN_PRODUCTS)} products with {EMBED_MODEL}...")
+    logger.info(f"RAG: Indexing {len(ARTISAN_PRODUCTS)} products with {EMBED_MODEL_NAME}...")
     texts = [_product_to_text(p) for p in ARTISAN_PRODUCTS]
     ids = [p["id"] for p in ARTISAN_PRODUCTS]
     metadatas = [{
@@ -85,7 +90,7 @@ async def index_dataset(force: bool = False) -> dict:
         "description": p["description"],
     } for p in ARTISAN_PRODUCTS]
 
-    embeddings = await embed(texts)
+    embeddings = embed(texts)
 
     if existing > 0:
         try:
@@ -93,23 +98,20 @@ async def index_dataset(force: bool = False) -> dict:
         except Exception:
             pass
 
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        documents=texts,
-        metadatas=metadatas
-    )
+    collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
     logger.info(f"RAG: Indexed {len(ARTISAN_PRODUCTS)} products.")
-    return {"status": "indexed", "count": len(ARTISAN_PRODUCTS), "model": EMBED_MODEL}
+    return {"status": "indexed", "count": len(ARTISAN_PRODUCTS), "model": EMBED_MODEL_NAME}
 
-async def retrieve_similar(query: str, n_results: int = 5, category_filter: str = None) -> list[dict]:
+
+async def retrieve_similar(query: str, n_results: int = 5,
+                           category_filter: str = None) -> list[dict]:
     collection = get_collection()
     if collection.count() == 0:
         await index_dataset()
 
     n = min(n_results, collection.count())
     where = {"category": category_filter} if category_filter else None
-    query_embedding = await embed([query])
+    query_embedding = embed([query])
 
     results = collection.query(
         query_embeddings=query_embedding,
@@ -136,8 +138,9 @@ async def retrieve_similar(query: str, n_results: int = 5, category_filter: str 
         })
     return retrieved
 
+
 def format_for_prompt(retrieved: list[dict]) -> str:
-    lines = ["Similar products from our knowledge base:"]
+    lines = ["Similar products from knowledge base:"]
     for i, p in enumerate(retrieved, 1):
         lines.append(
             f"{i}. {p['description']} | "
@@ -147,9 +150,15 @@ def format_for_prompt(retrieved: list[dict]) -> str:
         )
     return "\n".join(lines)
 
+
 async def get_index_status() -> dict:
     try:
         c = get_collection()
-        return {"indexed": c.count(), "total": len(ARTISAN_PRODUCTS), "ready": c.count() > 0}
+        return {
+            "indexed": c.count(),
+            "total": len(ARTISAN_PRODUCTS),
+            "ready": c.count() > 0,
+            "embed_model": EMBED_MODEL_NAME
+        }
     except Exception as e:
         return {"indexed": 0, "total": len(ARTISAN_PRODUCTS), "ready": False, "error": str(e)}

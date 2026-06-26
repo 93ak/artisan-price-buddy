@@ -5,13 +5,11 @@ from db.database import init_db
 import logging
 
 logger = logging.getLogger("uvicorn.error")
-
-app = FastAPI(title="Price Buddy API", version="2.1.0")
+app = FastAPI(title="Price Buddy API", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -19,7 +17,6 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     init_db()
-    # Index RAG dataset on startup (skips if already indexed)
     try:
         from rag.rag_service import index_dataset
         result = await index_dataset()
@@ -34,7 +31,6 @@ app.include_router(history.router, prefix="/history", tags=["history"])
 
 @app.post("/rag/index")
 async def reindex():
-    """Force re-index the RAG dataset."""
     from rag.rag_service import index_dataset
     return await index_dataset(force=True)
 
@@ -45,4 +41,4 @@ async def rag_status():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2.1.0"}
+    return {"status": "ok", "version": "3.0.0"}

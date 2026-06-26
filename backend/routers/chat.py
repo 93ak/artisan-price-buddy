@@ -2,39 +2,122 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import uuid
+import re
 import logging
 import traceback
-from services.ollama_service import analyze_product, build_system, call_ollama, extract_json
+from services.llm_service import (
+    call_llm, extract_json, CONVERSATIONAL_SYSTEM,
+    analyze_product, build_reasoning_reply
+)
 from rag.rag_service import retrieve_similar, format_for_prompt
-from db.database import save_message, get_session_messages, save_analysis, update_session_meta
+from db.database import (
+    save_message, get_session_messages, save_analysis,
+    update_session_meta, build_cross_session_context
+)
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
-CONVERSATIONAL_SYSTEM = """You are a pricing mentor for Indian artisans. The user is asking a follow-up question about their pricing analysis.
+# Pure question patterns — these and ONLY these get conversational replies
+PURE_QUESTION = re.compile(
+    r'^(why|what|how|where|which|who|when|explain|tell me|can you explain|'
+    r'what does|what is|what are|what was|how does|how did|how do)'
+    r'[^.!]*\?\s*$',
+    re.IGNORECASE
+)
 
-If the question is purely conversational (e.g. "why is labor X?", "explain this", "what does floor price mean?"):
-- Reply ONLY with JSON: {{"chat_reply": "your explanation here", "is_conversational": true}}
+def is_cost_update(message: str) -> bool:
+    """
+    Default to re-analysis UNLESS message is clearly a pure question with no new info.
+    Better to re-analyse too often than miss a cost update.
+    """
+    msg = message.strip()
+    # If it ends in ? and starts with a question word and has no numbers/cost words → conversational
+    if PURE_QUESTION.match(msg):
+        # But if it contains numbers or currency, still re-analyse
+        if not re.search(r'[₹\d]|rs\.?|rupees?|hours?|hrs?|mins?', msg, re.IGNORECASE):
+            return False
+    return True
 
-If the user provides new product information that changes the pricing:
-- Reply with the full pricing JSON (same schema as before).
+def build_combined_description(history: list, new_message: str) -> str:
+    """
+    Flatten conversation history into a single description for re-analysis.
+    Picks only user messages to avoid LLM hallucination contamination.
+    """
+    user_msgs = [m["content"] for m in history if m["role"] == "user"]
+    user_msgs.append(new_message)
+    return " | ".join(user_msgs)
 
-Labor math reminder: labor = hours × rate. 10 hours × ₹250/hr = ₹2500. Never use any other formula.
-Always confirm the exact hours and rate you are using in your reply."""
+async def run_reanalysis(session_id: str, history: list, new_message: str,
+                         cross_ctx: str) -> dict:
+    """Full re-analysis using all user info gathered so far in the session."""
+    combined = build_combined_description(history, new_message)
 
-async def handle_conversational(message: str, history: list) -> dict:
-    """Handle follow-up questions that don't need full re-analysis."""
-    messages = history[-6:] + [{"role": "user", "content": message}]  # last 3 exchanges
-    raw = await call_ollama(messages, system=CONVERSATIONAL_SYSTEM)
+    # RAG retrieval on combined description
+    rag_context = ""
+    try:
+        retrieved = await retrieve_similar(combined, n_results=5)
+        if retrieved:
+            rag_context = format_for_prompt(retrieved)
+    except Exception as e:
+        logger.warning(f"RAG failed in reanalysis (non-fatal): {e}")
+
+    result = await analyze_product(
+        combined,
+        rag_context=rag_context,
+        cross_session_context=cross_ctx
+    )
+
+    if "error" in result:
+        return None
+
+    # Recalculate in Python
+    costs = result.get("costs", {})
+    floor = sum(v for v in costs.values() if isinstance(v, (int, float)))
+    result["floor_price"] = round(floor)
+    tiers = result.setdefault("tiers", {})
+    tiers.setdefault("basic", {})["price"] = round(floor * 1.13)
+    tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
+    tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
+
+    # Persist updated analysis
+    try:
+        save_analysis(session_id, result)
+        update_session_meta(
+            session_id,
+            result.get("product_type", ""),
+            result.get("chat_reply", "")[:120]
+        )
+    except Exception as e:
+        logger.warning(f"DB save failed (non-fatal): {e}")
+
+    return result
+
+async def run_conversational(message: str, history: list, cross_ctx: str) -> str:
+    """Handle a pure question/explanation without touching pricing."""
+    recent = history[-6:]
+    messages = recent + [{"role": "user", "content": message}]
+    system = CONVERSATIONAL_SYSTEM + (f"\n\n{cross_ctx}" if cross_ctx else "")
+    raw = await call_llm(messages, system=system)
+
     parsed = extract_json(raw)
-    if parsed and parsed.get("is_conversational"):
-        return {"conversational": True, "reply": parsed.get("chat_reply", raw)}
-    # Returned full pricing JSON — treat as re-analysis
-    return {"conversational": False, "data": parsed, "raw": raw}
+    if parsed:
+        reply = parsed.get("chat_reply", "")
+        if reply:
+            return reply.strip()
+
+    # Strip raw JSON if it leaked
+    clean = raw.strip()
+    if clean.startswith("{"):
+        m = re.search(r'"chat_reply"\s*:\s*"((?:[^"\\]|\\.)*)"', clean)
+        return m.group(1).replace("\\n", "\n") if m else "Could you rephrase that?"
+    return clean
+
 
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+
 
 @router.post("")
 async def chat(req: ChatRequest):
@@ -44,32 +127,34 @@ async def chat(req: ChatRequest):
 
     save_message(session_id, "user", req.message)
 
+    cross_ctx = ""
     try:
-        result = await handle_conversational(req.message, history)
-    except Exception as e:
-        logger.error(f"Chat error: {e}\n{traceback.format_exc()}")
-        raise HTTPException(500, f"Chat failed: {str(e)}")
+        cross_ctx = build_cross_session_context(limit=2)
+    except Exception:
+        pass
 
-    if result["conversational"]:
-        reply = result["reply"]
+    try:
+        if is_cost_update(req.message):
+            # User gave new cost info → full re-analysis with everything we know
+            logger.info(f"Cost update detected in: '{req.message[:60]}' — running reanalysis")
+            result = await run_reanalysis(session_id, history, req.message, cross_ctx)
+
+            if result:
+                reply = result.get("chat_reply", "I've updated your pricing.")
+                save_message(session_id, "assistant", reply)
+                return {
+                    "session_id": session_id,
+                    "reply": reply,
+                    "type": "reanalysis",
+                    "data": result
+                }
+            # Reanalysis failed — fall through to conversational
+
+        # Pure question/explanation
+        reply = await run_conversational(req.message, history, cross_ctx)
         save_message(session_id, "assistant", reply)
         return {"session_id": session_id, "reply": reply, "type": "conversational"}
 
-    # Got updated pricing — return full analysis data
-    data = result.get("data")
-    if data and "costs" in data:
-        costs = data.get("costs", {})
-        floor = sum(v for v in costs.values() if isinstance(v, (int, float)))
-        data["floor_price"] = round(floor)
-        tiers = data.setdefault("tiers", {})
-        tiers.setdefault("basic", {})["price"] = round(floor * 1.13)
-        tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
-        tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
-        reply = data.get("chat_reply", "I've updated the analysis.")
-        save_message(session_id, "assistant", reply)
-        return {"session_id": session_id, "reply": reply, "type": "reanalysis", "data": data}
-
-    # Fallback
-    reply = result.get("raw", "I couldn't process that. Could you rephrase?")[:300]
-    save_message(session_id, "assistant", reply)
-    return {"session_id": session_id, "reply": reply, "type": "fallback"}
+    except Exception as e:
+        logger.error(f"Chat error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Chat failed: {str(e)}")
