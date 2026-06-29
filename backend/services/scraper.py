@@ -1,6 +1,7 @@
 import httpx
 import re
 import statistics
+from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from db.database import get_market_cache, set_market_cache
 
@@ -11,12 +12,41 @@ HEADERS = {
 
 PRICE_RE = re.compile(r'(?:₹|Rs\.?\s*)(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 
-# Domains known to list individual handmade products at realistic prices
-PREFERRED_DOMAINS = ["etsy.com", "meesho.com", "amazon.in", "flipkart.com",
-                     "indiamart.com", "craftsvilla.com", "jaypore.com", "okhai.com"]
+# Only fetch from these — everything else is blocked even if DDG returns it
+ALLOWED_DOMAINS = {
+    "meesho.com", "indiamart.com", "etsy.com", "craftsvilla.com",
+    "okhai.com", "jaypore.com", "gaatha.com", "theloom.in",
+    "ekscraft.com", "craftshopindia.com", "indianroots.com",
+}
 
-async def duckduckgo_search(query: str, num_results: int = 8) -> list[str]:
-    search_query = f"{query} buy handmade India site:etsy.com OR site:meesho.com OR site:amazon.in OR site:indiamart.com"
+# Hard blocklist as a second safety net
+BLOCKED_DOMAINS = {
+    "amazon.in", "amazon.com", "flipkart.com", "myntra.com",
+    "ajio.com", "nykaa.com", "snapdeal.com", "shopclues.com",
+    "youtube.com", "instagram.com", "facebook.com", "pinterest.com",
+    "udemy.com", "coursera.org", "skillshare.com",  # course sites inflate prices
+}
+
+def get_domain(url: str) -> str:
+    try:
+        return urlparse(url).netloc.replace("www.", "").lower()
+    except Exception:
+        return ""
+
+def is_allowed_url(url: str) -> bool:
+    domain = get_domain(url)
+    if any(blocked in domain for blocked in BLOCKED_DOMAINS):
+        return False
+    if any(allowed in domain for allowed in ALLOWED_DOMAINS):
+        return True
+    return False  # default deny — only fetch from known-good domains
+
+async def duckduckgo_search(query: str, num_results: int = 10) -> list[str]:
+    search_query = (
+        f"{query} handmade buy price India "
+        f"site:meesho.com OR site:indiamart.com OR site:etsy.com "
+        f"OR site:craftsvilla.com OR site:okhai.com OR site:jaypore.com"
+    )
     url = "https://html.duckduckgo.com/html/"
     async with httpx.AsyncClient(timeout=15.0, headers=HEADERS, follow_redirects=True) as client:
         resp = await client.post(url, data={"q": search_query})
@@ -24,55 +54,58 @@ async def duckduckgo_search(query: str, num_results: int = 8) -> list[str]:
         links = []
         for a in soup.select("a.result__url"):
             href = a.get("href", "")
-            if href and href.startswith("http") and not any(
-                x in href for x in ["duckduckgo", "bing.com", "google.com"]
-            ):
-                links.append(href)
-                if len(links) >= num_results:
-                    break
+            if not href or not href.startswith("http"):
+                continue
+            if not is_allowed_url(href):
+                continue
+            links.append(href)
+            if len(links) >= num_results:
+                break
         return links
 
-def is_product_price(val: float, query: str) -> bool:
-    """
-    Heuristic: is this a plausible unit price for this product?
-    Filters out page-level noise like course fees, bulk rates, unrelated numbers.
-    """
-    # Tight range: ₹50 to ₹15000 for most handmade items
+def is_plausible_price(val: float) -> bool:
     if val < 50 or val > 15000:
         return False
-    # Round numbers above 5000 are suspicious (course fees, bulk minimums)
+    # Round thousands above 5k are usually bulk/wholesale minimums
     if val >= 5000 and val % 1000 == 0:
         return False
     return True
 
-async def scrape_prices_from_url(url: str, query: str = "") -> list[float]:
+async def scrape_prices_from_url(url: str) -> list[float]:
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=HEADERS, follow_redirects=True) as client:
             resp = await client.get(url)
             if resp.status_code != 200:
                 return []
+
+            # Final domain check after redirects (catches redirect to amazon etc.)
+            final_domain = get_domain(str(resp.url))
+            if any(blocked in final_domain for blocked in BLOCKED_DOMAINS):
+                return []
+
             soup = BeautifulSoup(resp.text, "html.parser")
 
-            # Focus on price-bearing elements first (product cards, price tags)
-            price_elements = soup.select(
+            # Target price-specific elements first
+            price_els = soup.select(
                 "[class*='price'], [class*='Price'], [class*='cost'], "
-                "[class*='amount'], [itemprop='price'], [class*='mrp']"
+                "[class*='amount'], [itemprop='price'], [class*='mrp'], "
+                "[class*='rate'], [class*='Rate']"
             )
-            targeted_text = " ".join(el.get_text() for el in price_elements)
+            text = " ".join(el.get_text() for el in price_els)
 
-            # Fall back to full page if no targeted elements found
-            if not targeted_text.strip():
+            # Fall back to page body if nothing found
+            if not text.strip():
                 for tag in soup(["script", "style", "nav", "footer", "header"]):
                     tag.decompose()
-                targeted_text = soup.get_text(separator=" ")
+                text = soup.get_text(separator=" ")
 
-            matches = PRICE_RE.findall(targeted_text)
+            matches = PRICE_RE.findall(text)
             prices = []
             seen = set()
             for m in matches:
                 try:
                     val = float(m.replace(",", ""))
-                    if val not in seen and is_product_price(val, query):
+                    if val not in seen and is_plausible_price(val):
                         prices.append(val)
                         seen.add(val)
                 except ValueError:
@@ -89,7 +122,6 @@ def compute_market_stats(all_prices: list[float]) -> dict:
             "note": "No market data found."
         }
 
-    # IQR outlier removal — more aggressive (1.0× instead of 1.5×)
     if len(all_prices) >= 4:
         q1 = statistics.quantiles(all_prices, n=4)[0]
         q3 = statistics.quantiles(all_prices, n=4)[2]
@@ -121,8 +153,8 @@ async def research_market(query: str) -> dict:
     urls = await duckduckgo_search(query)
     sources = []
 
-    for url in urls[:5]:
-        prices = await scrape_prices_from_url(url, query)
+    for url in urls[:6]:
+        prices = await scrape_prices_from_url(url)
         if prices:
             all_prices.extend(prices)
             sources.append(url)

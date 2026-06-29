@@ -5,6 +5,9 @@ AI-powered pricing assistant for artisans. Uses Ollama (Llama 3.1 8B) locally + 
 cd backend
 .\venv\Scripts\Activate
 uvicorn main:app --reload --port 8080
+
+cd frontend
+python -m httpserver 3000
 ## Folder structure
 
 ```

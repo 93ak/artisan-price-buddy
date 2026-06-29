@@ -20,9 +20,11 @@ Craft time DEFAULTS (use ONLY if user did not state hours): crochet teddy=5hr, c
 CRITICAL RULES — read carefully:
 - If user states hours explicitly ("10 hours", "took me 3 hrs"), USE THAT EXACT NUMBER.
 - If user states material cost, USE IT AS-IS. Never multiply by quantity.
-- marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
+- If user states marketplace fee, USE IT AS-IS. Never multiply by quantity.
+- If not, marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
 - waste_allowance = round(materials * 0.10)
 - All JSON values must be plain integers. NEVER write expressions like "250*10".
+- "user_planned_price" must be null UNLESS the user explicitly states a price they plan to sell at (e.g. "I want to sell at ₹500", "my price is 300 rs"). NEVER invent or assume a planned price.
 
 Packaging inference (from user description):
 - No packaging mentioned → ask in missing_info, use 0
@@ -154,7 +156,16 @@ async def analyze_product(user_message: str, history: list = [],
             "chat_reply": "I had trouble processing that. Could you tell me: what you make, material cost, and how long it takes?"
         }
 
-    # Always recalculate in Python — never trust LLM math
+    # Never trust LLM on planned price — only keep it if user explicitly mentioned one
+    planned = parsed.get("user_planned_price")
+    if planned is not None:
+        price_keywords = re.search(
+            r'(sell|selling|sold|price|charge|plan|want|going)\s*(at|for|to)?\s*[₹\d]|'
+            r'[₹\d]\s*(rs|rupees?|inr)',
+            user_message, re.IGNORECASE
+        )
+        if not price_keywords:
+            parsed["user_planned_price"] = None
     costs = parsed.get("costs", {})
     numeric_costs = {k: v for k, v in costs.items() if isinstance(v, (int, float))}
     floor = sum(numeric_costs.values())
