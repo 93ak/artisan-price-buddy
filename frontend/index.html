@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Price Buddy v2</title>
+<title>Price Buddy v3</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,24 +11,24 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 
 /* Sidebar */
 .sidebar { width: 240px; background: #fff; border-right: 0.5px solid #e5e5e5; display: flex; flex-direction: column; flex-shrink: 0; height: 100vh; overflow: hidden; }
-.sidebar-head { padding: 1rem 1.25rem; border-bottom: 0.5px solid #e8e8e8; }
+.sidebar-head { padding: 1rem 1.25rem; border-bottom: 0.5px solid #e8e8e8; flex-shrink: 0; }
 .sidebar-logo { font-size: 16px; font-weight: 700; color: #111; display: flex; align-items: center; gap: 8px; }
 .sidebar-logo i { color: #185fa5; }
 .sidebar-tagline { font-size: 11px; color: #aaa; margin-top: 2px; }
-.sidebar-section { padding: 0.75rem 1rem 0.5rem; font-size: 11px; font-weight: 600; color: #bbb; letter-spacing: 0.06em; text-transform: uppercase; }
+.sidebar-section { padding: 0.75rem 1rem 0.5rem; font-size: 11px; font-weight: 600; color: #bbb; letter-spacing: 0.06em; text-transform: uppercase; flex-shrink: 0; }
 .session-item { padding: 8px 1rem; cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
 .session-item:hover { background: #f7f7f5; border-left-color: #c5d9ef; }
 .session-item.active { background: #eef3fb; border-left-color: #185fa5; }
 .session-name { font-size: 13px; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
-.new-chat-btn { margin: 0.75rem 1rem; padding: 9px 12px; border: 0.5px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; color: #555; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.new-chat-btn { margin: 0.75rem 1rem; padding: 9px 12px; border: 0.5px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; color: #555; display: flex; align-items: center; gap: 6px; transition: all 0.15s; flex-shrink: 0; }
 .new-chat-btn:hover { background: #f0f0f0; }
 .sidebar-empty { font-size: 12px; color: #ccc; padding: 0.5rem 1rem; font-style: italic; }
 #session-list { overflow-y: auto; flex: 1; }
 
 /* Main */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow: hidden; }
-.topbar { padding: 0.875rem 1.5rem; background: #fff; border-bottom: 0.5px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; }
+.topbar { padding: 0.875rem 1.5rem; background: #fff; border-bottom: 0.5px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .topbar-title { font-size: 15px; font-weight: 600; color: #111; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 5px; }
 .status-dot.online { background: #1d9e75; }
@@ -37,7 +37,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 /* Chat area */
 .chat-area { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .messages-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
-.msgs { flex: 1; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.msgs { flex: 1; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
 .msg { display: flex; gap: 10px; align-items: flex-start; }
 .msg.user { flex-direction: row-reverse; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
@@ -51,6 +51,78 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+/* ── Follow-up question cards ─────────────────────────────────────────────── */
+.fq-card {
+  background: #f7fbff;
+  border: 1.5px solid #c5d9ef;
+  border-radius: 14px;
+  padding: 14px 16px;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fq-question {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111;
+  line-height: 1.4;
+}
+.fq-sub { font-size: 12px; color: #888; margin-top: 2px; }
+
+/* Star rating input */
+.star-row { display: flex; gap: 6px; align-items: center; }
+.star {
+  font-size: 28px;
+  cursor: pointer;
+  color: #ddd;
+  transition: color 0.12s, transform 0.1s;
+  line-height: 1;
+  user-select: none;
+}
+.star:hover, .star.lit { color: #f5a623; }
+.star:hover { transform: scale(1.15); }
+.star-label {
+  font-size: 12px;
+  color: #185fa5;
+  min-height: 18px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Number input */
+.num-row { display: flex; gap: 8px; align-items: center; }
+.num-input {
+  flex: 1;
+  font-size: 22px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border: 1.5px solid #c5d9ef;
+  border-radius: 10px;
+  outline: none;
+  color: #111;
+  background: #fff;
+  max-width: 180px;
+}
+.num-input:focus { border-color: #185fa5; }
+.num-unit { font-size: 14px; color: #888; font-weight: 500; }
+
+/* Submit button inside question card */
+.fq-submit {
+  align-self: flex-start;
+  padding: 8px 20px;
+  background: #185fa5;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.fq-submit:hover { background: #0c447c; }
+.fq-submit:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Results panel */
 .results-panel { width: 320px; border-left: 0.5px solid #e8e8e8; background: #fafafa; overflow-y: auto; flex-shrink: 0; padding: 1rem; display: flex; flex-direction: column; gap: 10px; height: 100%; }
@@ -78,22 +150,19 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 .mbar-track { flex: 1; height: 7px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
 .mbar-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
 .mbar-val { width: 45px; color: #111; font-weight: 500; font-size: 12px; }
-.market-note { font-size: 11px; color: #aaa; margin-top: 6px; }
 .your-pos { font-size: 12px; color: #555; margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; }
 .your-dot { width: 7px; height: 7px; border-radius: 50%; background: #e24b4a; flex-shrink: 0; margin-top: 4px; }
 .conf-bar { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; margin: 6px 0; }
 .conf-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
 .conf-text { font-size: 11px; color: #888; }
-.reasoning { font-size: 12px; color: #666; line-height: 1.5; font-style: italic; background: #f9f9f7; border-radius: 6px; padding: 8px; }
 .missing { display: flex; flex-direction: column; gap: 4px; }
 .missing-item { font-size: 12px; color: #885f0b; display: flex; align-items: flex-start; gap: 5px; }
 .missing-item i { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-.sources { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-.source-link { font-size: 11px; color: #185fa5; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-link { font-size: 11px; color: #185fa5; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .source-link:hover { text-decoration: underline; }
 
-/* Input */
-.input-area { padding: 0.75rem 1.5rem 1rem; border-top: 0.5px solid #e8e8e8; background: #fff; display: flex; gap: 8px; align-items: flex-end; }
+/* Input area */
+.input-area { padding: 0.75rem 1.5rem 1rem; border-top: 0.5px solid #e8e8e8; background: #fff; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
 textarea { flex: 1; font-size: 14px; font-family: inherit; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; resize: none; min-height: 44px; max-height: 120px; line-height: 1.5; color: #111; background: #fafafa; outline: none; }
 textarea:focus { border-color: #185fa5; background: #fff; }
 .send-btn { width: 44px; height: 44px; border-radius: 10px; border: none; background: #185fa5; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; flex-shrink: 0; transition: opacity 0.15s; }
@@ -101,7 +170,7 @@ textarea:focus { border-color: #185fa5; background: #fff; }
 .send-btn:not(:disabled):hover { background: #0c447c; }
 
 /* Pills */
-.pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0.75rem 1.5rem; background: #fff; border-bottom: 0.5px solid #f2f2f2; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0.75rem 1.5rem; background: #fff; border-bottom: 0.5px solid #f2f2f2; flex-shrink: 0; }
 .pill { font-size: 12px; padding: 5px 12px; border-radius: 100px; border: 0.5px solid #ccc; color: #555; cursor: pointer; background: #f9f9f9; transition: all 0.15s; }
 .pill:hover { background: #eef3fb; border-color: #185fa5; color: #185fa5; }
 .hidden { display: none !important; }
@@ -114,7 +183,6 @@ textarea:focus { border-color: #185fa5; background: #fff; }
 </head>
 <body>
 
-<!-- Sidebar -->
 <div class="sidebar">
   <div class="sidebar-head">
     <div class="sidebar-logo"><i class="ti ti-tag"></i> Price Buddy</div>
@@ -127,7 +195,6 @@ textarea:focus { border-color: #185fa5; background: #fff; }
   <div id="session-list"><div class="sidebar-empty">No sessions yet</div></div>
 </div>
 
-<!-- Main -->
 <div class="main">
   <div class="topbar">
     <div class="topbar-title" id="chat-title">New analysis</div>
@@ -156,7 +223,6 @@ textarea:focus { border-color: #185fa5; background: #fff; }
       </div>
     </div>
 
-    <!-- Results panel -->
     <div class="results-panel" id="results-panel">
       <div class="panel-empty" id="panel-empty">
         <i class="ti ti-calculator"></i>
@@ -172,6 +238,22 @@ const API = "http://localhost:8080";
 let sessionId = null;
 let busy = false;
 
+// ── Star label lookup (mirrors backend STAR_MAPPINGS) ─────────────────────────
+// Must match backend STAR_MAPPINGS exactly — these are shown under stars
+const STAR_LABELS = {
+  packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"],
+  work_quality:      ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"],
+  experience_level:  ["Just started <1yr","Some experience 1-2yr","Intermediate 2-4yr","Experienced 4-8yr","Expert 8+yr"],
+  uniqueness:           ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"],
+  marketplace_platform: ["Offline / local","Instagram / WhatsApp","Meesho / Flipkart","Etsy / Amazon","Own website / boutique"],
+};
+
+function getStarLabels(field, fallbackLabels) {
+  // Use backend-locked labels if field is known, otherwise use whatever LLM sent
+  return STAR_LABELS[field] || fallbackLabels || ["1★","2★","3★","4★","5★"];
+}
+
+// ── Health / session plumbing ─────────────────────────────────────────────────
 async function checkHealth() {
   try {
     const r = await fetch(API + "/health");
@@ -179,9 +261,7 @@ async function checkHealth() {
       document.getElementById("status-dot").classList.add("online");
       document.getElementById("status-text").textContent = "Backend ready";
     } else throw new Error();
-  } catch {
-    document.getElementById("status-text").textContent = "Backend offline";
-  }
+  } catch { document.getElementById("status-text").textContent = "Backend offline"; }
 }
 
 async function loadSessions() {
@@ -191,7 +271,8 @@ async function loadSessions() {
     const list = document.getElementById("session-list");
     if (!sessions.length) { list.innerHTML = '<div class="sidebar-empty">No sessions yet</div>'; return; }
     list.innerHTML = sessions.map(s => `
-      <div class="session-item ${s.id === sessionId ? 'active' : ''}" onclick="loadSession('${s.id}', '${(s.product_type||'Session').replace(/'/g,"\\'")}')">
+      <div class="session-item ${s.id === sessionId ? 'active' : ''}"
+           onclick="loadSession('${s.id}','${(s.product_type||'Session').replace(/'/g,"\\'")}')">
         <div class="session-name">${s.product_type || "Unnamed product"}</div>
         <div class="session-meta">${s.msg_count} messages · ${s.created_at.slice(0,10)}</div>
       </div>`).join('');
@@ -237,6 +318,7 @@ function handleKey(e) {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 }
 
+// ── Chat message rendering ────────────────────────────────────────────────────
 function addMsg(role, html) {
   const msgs = document.getElementById("msgs");
   const d = document.createElement("div");
@@ -259,27 +341,180 @@ function showTyping() {
 
 function removeTyping() { const t = document.getElementById("typing"); if (t) t.remove(); }
 
+// ── Follow-up question card rendering ────────────────────────────────────────
+// Store on window so inline oninput handlers can always reach it
+window._fqAnswers = {};
+
+function renderFollowUpQuestions(questions) {
+  if (!questions || !questions.length) return;
+  // Fresh object for this question set
+  window._fqAnswers = {};
+
+  const msgs = document.getElementById("msgs");
+  const wrapper = document.createElement("div");
+  wrapper.className = "msg assistant";
+  wrapper.innerHTML = '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div>';
+
+  const cardWrap = document.createElement("div");
+  cardWrap.style.cssText = "display:flex;flex-direction:column;gap:10px;max-width:85%";
+
+  questions.forEach(q => {
+    const card = document.createElement("div");
+    card.className = "fq-card";
+    const uid = q.field; // field name is always unique per question set
+
+    if (q.type === "stars") {
+      const labels = getStarLabels(q.field, q.star_labels);
+      card.innerHTML = `
+        <div>
+          <div class="fq-question">${q.question}</div>
+          <div class="fq-sub">Tap to rate</div>
+        </div>
+        <div>
+          <div class="star-row" id="stars-${uid}">
+            ${[1,2,3,4,5].map(n =>
+              `<span class="star" data-n="${n}" data-field="${uid}" onclick="setStar('${uid}',${n})">★</span>`
+            ).join("")}
+          </div>
+          <div class="star-label" id="star-label-${uid}">—</div>
+        </div>`;
+    } else {
+      card.innerHTML = `
+        <div>
+          <div class="fq-question">${q.question}</div>
+          <div class="fq-sub">Enter the value below</div>
+        </div>
+        <div class="num-row">
+          <input class="num-input" type="number" min="0" placeholder="0"
+                 oninput="setNum('${uid}', this.value)"/>
+          ${q.unit ? `<span class="num-unit">${q.unit}</span>` : ''}
+        </div>`;
+    }
+    cardWrap.appendChild(card);
+  });
+
+  const submitBtn = document.createElement("button");
+  submitBtn.className = "fq-submit";
+  submitBtn.textContent = "Update pricing ↑";
+  submitBtn.onclick = () => submitAnswers(submitBtn);
+  cardWrap.appendChild(submitBtn);
+
+  wrapper.appendChild(cardWrap);
+  msgs.appendChild(wrapper);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function setStar(uid, val) {
+  window._fqAnswers[uid] = val;
+  // Light up stars 1..val, dim val+1..5
+  document.querySelectorAll(`#stars-${uid} .star`).forEach(s => {
+    s.classList.toggle("lit", parseInt(s.dataset.n) <= val);
+  });
+  const labels = getStarLabels(uid, []);
+  const labelEl = document.getElementById(`star-label-${uid}`);
+  if (labelEl) labelEl.textContent = labels[val - 1] || `${val} star${val > 1 ? 's' : ''}`;
+}
+
+function setNum(uid, val) {
+  const num = parseFloat(val);
+  window._fqAnswers[uid] = isNaN(num) ? null : num;
+  console.log("setNum", uid, num, window._fqAnswers);
+}
+
+async function submitAnswers(btn) {
+  const answers = window._fqAnswers;
+  console.log("submitAnswers", answers);
+  // Validate at least one answer given
+  const filled = Object.values(answers).filter(v => v !== null && v !== undefined);
+  if (!filled.length) { btn.textContent = "Please answer at least one question"; return; }
+
+  btn.disabled = true;
+  btn.textContent = "Updating…";
+  busy = true;
+  document.getElementById("sbtn").disabled = true;
+
+  // Show user summary in chat
+  const summary = Object.entries(answers)
+    .filter(([,v]) => v !== null && v !== undefined)
+    .map(([k, v]) => {
+      const labels = STAR_LABELS[k];
+      if (labels && typeof v === "number" && Number.isInteger(v)) {
+        return `${k.replace(/_/g," ")}: ${v}★ (${labels[v-1]})`;
+      }
+      return `${k.replace(/_/g," ")}: ${v}`;
+    }).join(", ");
+  addMsg("user", summary);
+  showTyping();
+
+  try {
+    const r = await fetch(API + "/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "",
+        session_id: sessionId,
+        question_answers: answers
+      })
+    });
+
+    removeTyping();
+
+    if (!r.ok) {
+      const err = await r.json();
+      addMsg("assistant", `Error: ${err.detail || "Something went wrong."}`);
+    } else {
+      const data = await r.json();
+      sessionId = data.session_id;
+      addMsg("assistant", data.reply);
+      if (data.type === "reanalysis" && data.data) {
+        renderPanel(data.data);
+      }
+      // Ask follow-up questions if still needed
+      const next = data.follow_up_questions || [];
+      if (next.length) {
+        renderFollowUpQuestions(next);
+      }
+    }
+  } catch(e) {
+    removeTyping();
+    addMsg("assistant", "Could not reach backend.");
+  }
+
+  busy = false;
+  document.getElementById("sbtn").disabled = false;
+}
+
+// ── Panel rendering ───────────────────────────────────────────────────────────
 function renderPanel(d) {
   const market = d.market || {};
   const costs = d.costs || {};
+
+  // Cost breakdown
   const costItems = [
     ["Materials", costs.materials],
     ["Labor", costs.labor],
-    ["Packaging", costs.packaging],
-    ["Transport", costs.transport],
+    ["Packaging", costs.packaging, costs.packaging_note],
+    ["Transport", costs.transport, costs.transport_note],
     ["Marketplace fee (8%)", costs.marketplace_fee],
     ["Waste allowance (10%)", costs.waste_allowance],
   ];
-
   let costHtml = costItems
     .filter(([,v]) => v != null)
-    .map(([k,v]) => `<div class="brow"><span>${k}</span><span class="val">₹${v}</span></div>`).join("");
+    .map(([k,v,note]) => `
+      <div class="brow">
+        <span>${k}${note ? ` <span style="font-size:10px;color:#aaa">(${note})</span>` : ''}</span>
+        <span class="val">₹${v}</span>
+      </div>`).join("");
   costHtml += `<div class="brow total"><span>Floor price</span><span class="val">₹${d.floor_price}</span></div>`;
   if (d.user_planned_price) {
     const diff = d.user_planned_price - d.floor_price;
-    costHtml += `<div class="brow ${diff < 0 ? 'loss' : 'profit'}"><span>Your planned price</span><span class="val">₹${d.user_planned_price} (${diff < 0 ? '−₹'+Math.abs(diff)+' loss' : '+₹'+diff})</span></div>`;
+    costHtml += `<div class="brow ${diff < 0 ? 'loss' : 'profit'}">
+      <span>Your planned price</span>
+      <span class="val">₹${d.user_planned_price} (${diff < 0 ? '−₹'+Math.abs(diff)+' loss' : '+₹'+diff})</span>
+    </div>`;
   }
 
+  // Tiers
   const tierValues = Object.values(d.tiers || {});
   const tiersHtml = tierValues.map((t, i) => `
     <div class="tier${i===1?' rec':''}">
@@ -290,57 +525,47 @@ function renderPanel(d) {
       <div class="tier-price">₹${t.price}</div>
     </div>`).join("");
 
-  // ── Market card ───────────────────────────────────────────────────────────
+  // Market card
   const hasMarketPrices = market.market_min != null;
   const maxV = market.market_max || 1;
   const std = tierValues[1]?.price || 0;
-
   let mktHtml = "";
   if (hasMarketPrices) {
-    const bars = [
-      ["Min", market.market_min, "#9fe1cb"],
-      ["Avg", market.market_avg, "#1d9e75"],
-      ["Max", market.market_max, "#085041"]
-    ];
+    const bars = [["Min",market.market_min,"#9fe1cb"],["Avg",market.market_avg,"#1d9e75"],["Max",market.market_max,"#085041"]];
     mktHtml += bars.map(([l,v,c]) =>
       `<div class="mbar-row"><div class="mbar-label">${l}</div><div class="mbar-track"><div class="mbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${c}"></div></div><div class="mbar-val">₹${v}</div></div>`
     ).join("");
-    const pos = std < market.market_min ? `Your standard price ₹${std} is below market min — you can charge more`
-      : std < market.market_avg ? `Your standard price ₹${std} is below market average — good value positioning`
-      : std <= market.market_max ? `Your standard price ₹${std} is in the mid-to-premium range`
-      : `Your standard price ₹${std} is above market max — justify with quality`;
+    const pos = std < market.market_min ? `₹${std} is below market min — you can charge more`
+      : std < market.market_avg ? `₹${std} is below market average — good value positioning`
+      : std <= market.market_max ? `₹${std} is in the mid-to-premium range`
+      : `₹${std} is above market max — justify with quality`;
     mktHtml += `<div class="your-pos"><div class="your-dot"></div><span>${pos}</span></div>`;
   } else {
-    mktHtml += `<div style="font-size:12px;color:#aaa;font-style:italic">No prices found in this scrape — DuckDuckGo may have rate-limited the request. Results are cached for 6hrs.</div>`;
+    mktHtml += `<div style="font-size:12px;color:#aaa;font-style:italic">No prices found — DuckDuckGo may have rate-limited. Cached for 6hrs.</div>`;
   }
-
-  // Scrape stats row — always show
-  const sampleCount = market.sample_count || 0;
   const sources = market.sources || [];
   const fromCache = market.from_cache ? " (cached)" : "";
-  mktHtml += `
-    <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid #f0f0f0">
-      <div style="font-size:11px;color:#888;margin-bottom:5px">
-        <i class="ti ti-database" style="font-size:12px"></i>
-        Scraped <strong>${sampleCount}</strong> prices from <strong>${sources.length}</strong> sites${fromCache}
-      </div>
-      ${sources.length ? sources.slice(0,5).map(s => {
-        let host = s;
-        try { host = new URL(s).hostname.replace("www.",""); } catch(e) {}
-        return `<a class="source-link" href="${s}" target="_blank" rel="noopener">↗ ${host}</a>`;
-      }).join("") : '<span style="font-size:11px;color:#ccc">No sources</span>'}
+  mktHtml += `<div style="margin-top:10px;padding-top:8px;border-top:0.5px solid #f0f0f0">
+    <div style="font-size:11px;color:#888;margin-bottom:5px">
+      <i class="ti ti-database" style="font-size:12px"></i>
+      Scraped <strong>${market.sample_count||0}</strong> prices from <strong>${sources.length}</strong> sites${fromCache}
     </div>
-  `;
+    ${sources.length ? sources.slice(0,5).map(s => {
+      let host = s; try { host = new URL(s).hostname.replace("www.",""); } catch(e) {}
+      return `<a class="source-link" href="${s}" target="_blank" rel="noopener">↗ ${host}</a>`;
+    }).join("") : '<span style="font-size:11px;color:#ccc">No sources</span>'}
+  </div>`;
 
-  // ── Confidence + missing info ──────────────────────────────────────────────
+  // Confidence
   const conf = Math.round((d.confidence||0.5) * 100);
   const confColor = conf >= 75 ? "#1d9e75" : conf >= 55 ? "#ba7517" : "#e24b4a";
 
+  // Missing info
   const missingHtml = (d.missing_info||[]).length
     ? `<div class="card"><div class="card-title"><i class="ti ti-info-circle" style="color:#ba7517"></i> To improve accuracy</div><div class="missing">${d.missing_info.map(m=>`<div class="missing-item"><i class="ti ti-point" style="color:#ba7517"></i>${m}</div>`).join("")}</div></div>`
     : "";
 
-  // ── RAG card ──────────────────────────────────────────────────────────────
+  // RAG
   const ragProducts = d.retrieved_products || [];
   const ragHtml = ragProducts.length ? `
     <div class="card">
@@ -348,7 +573,7 @@ function renderPanel(d) {
       ${ragProducts.slice(0,3).map(p => `
         <div class="brow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0">
           <span style="font-size:12px;color:#111">${p.description}</span>
-          <span style="font-size:11px;color:#888">₹${p.selling_price} · ${p.complexity} · ${p.experience_level} · similarity ${Math.round(p.similarity_score*100)}%</span>
+          <span style="font-size:11px;color:#888">₹${p.selling_price} · ${p.complexity} · similarity ${Math.round(p.similarity_score*100)}%</span>
         </div>`).join("")}
     </div>` : "";
 
@@ -359,12 +584,14 @@ function renderPanel(d) {
     <div class="card"><div class="card-title"><i class="ti ti-calculator"></i> Cost breakdown</div>${costHtml}</div>
     <div class="card"><div class="card-title"><i class="ti ti-layers"></i> Pricing tiers</div><div class="tiers">${tiersHtml}</div></div>
     <div class="card"><div class="card-title"><i class="ti ti-chart-bar"></i> Market research</div>${mktHtml}</div>
-    <div class="card"><div class="card-title"><i class="ti ti-shield-check"></i> Confidence</div><div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div><div class="conf-text">${conf}% — ${d.labor_reasoning||""}</div></div>
-    ${missingHtml}
-    ${ragHtml}
-  `;
+    <div class="card"><div class="card-title"><i class="ti ti-shield-check"></i> Confidence</div>
+      <div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div>
+      <div class="conf-text">${conf}% — ${d.labor_reasoning||""}</div>
+    </div>
+    ${missingHtml}${ragHtml}`;
 }
 
+// ── Main send ─────────────────────────────────────────────────────────────────
 async function send() {
   if (busy) return;
   const inp = document.getElementById("inp");
@@ -379,8 +606,6 @@ async function send() {
   showTyping();
 
   try {
-    // First message in session → /analyze (full pipeline)
-    // Follow-up in existing session → /chat (conversational)
     const isFollowUp = sessionId !== null;
     const endpoint = isFollowUp ? "/chat" : "/analyze";
     const body = isFollowUp
@@ -407,20 +632,22 @@ async function send() {
         addMsg("assistant", data.chat_reply);
         renderPanel(data);
         loadSessions();
+        // Render follow-up questions if any
+        if (data.follow_up_questions && data.follow_up_questions.length) {
+          renderFollowUpQuestions(data.follow_up_questions);
+        }
       } else {
         let reply = data.reply || "";
         if (reply.trim().startsWith("{")) {
-          try {
-            const inner = JSON.parse(reply);
-            reply = inner.chat_reply || reply;
-          } catch(e) {
-            const m = reply.match(/"chat_reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-            if (m) reply = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
-          }
+          try { const inner = JSON.parse(reply); reply = inner.chat_reply || reply; }
+          catch(e) { const m = reply.match(/"chat_reply"\s*:\s*"((?:[^"\\]|\\.)*)"/); if (m) reply = m[1]; }
         }
         addMsg("assistant", reply);
         if (data.type === "reanalysis" && data.data) {
           renderPanel(data.data);
+        }
+        if (data.follow_up_questions && data.follow_up_questions.length) {
+          renderFollowUpQuestions(data.follow_up_questions);
         }
       }
     }

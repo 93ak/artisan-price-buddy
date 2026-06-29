@@ -30,6 +30,7 @@ class AnalyzeResponse(BaseModel):
     missing_info: list = []
     retrieved_products: list = []
     rag_influence: Optional[str] = None
+    follow_up_questions: list = []   # ← new
 
 @router.post("", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest):
@@ -109,6 +110,7 @@ async def analyze(req: AnalyzeRequest):
             missing_info=result.get("missing_info", []),
             retrieved_products=retrieved,
             rag_influence=result.get("rag_influence"),
+            follow_up_questions=result.get("follow_up_questions", []),
         )
 
     except HTTPException:

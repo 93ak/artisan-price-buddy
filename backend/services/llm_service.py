@@ -10,52 +10,104 @@ load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
-MODEL = "llama-3.1-8b-instant"  # swap to "llama3-70b-8192" for better quality
+MODEL = "llama-3.1-8b-instant"
+
+# ── Star rating → value mappings ──────────────────────────────────────────────
+# Used to convert frontend star inputs into concrete values for re-analysis
+STAR_MAPPINGS = {
+    "packaging_quality": {
+        1: {"value": 5,   "label": "No packaging (just the item)"},
+        2: {"value": 10,  "label": "Basic poly bag or newspaper"},
+        3: {"value": 25,  "label": "Kraft paper box or simple wrap"},
+        4: {"value": 60,  "label": "Gift box with tissue and ribbon"},
+        5: {"value": 120, "label": "Premium branded box with inserts"},
+    },
+    "work_quality": {
+        1: {"value": 80,  "label": "Learning / practice pieces"},
+        2: {"value": 120, "label": "Decent, minor imperfections"},
+        3: {"value": 150, "label": "Good, market standard"},
+        4: {"value": 220, "label": "Polished, professional finish"},
+        5: {"value": 350, "label": "Expert, gallery or gift quality"},
+    },
+    "experience_level": {
+        1: {"value": 80,  "label": "Just started (beginner, <1 yr)"},
+        2: {"value": 120, "label": "Some experience (1-2 yrs)"},
+        3: {"value": 150, "label": "Intermediate (2-4 yrs)"},
+        4: {"value": 250, "label": "Experienced (4-8 yrs)"},
+        5: {"value": 400, "label": "Expert / professional (8+ yrs)"},
+    },
+    "uniqueness": {
+        1: {"value": 1.0,  "label": "Very common design"},
+        2: {"value": 1.1,  "label": "Slight variation on common"},
+        3: {"value": 1.2,  "label": "Some unique elements"},
+        4: {"value": 1.35, "label": "Distinctive, hard to find"},
+        5: {"value": 1.55, "label": "One-of-a-kind / signature work"},
+    },
+    "marketplace_platform": {
+        1: {"value": 0,    "fee_pct": 0,    "label": "Selling offline / local (no fee)"},
+        2: {"value": 0,    "fee_pct": 0,    "label": "Instagram / WhatsApp direct (no fee)"},
+        3: {"value": 15,   "fee_pct": 15,   "label": "Meesho / Flipkart (~15% fee)"},
+        4: {"value": 6.5,  "fee_pct": 6.5,  "label": "Etsy / Amazon (~6.5% fee)"},
+        5: {"value": 0,    "fee_pct": 2,    "label": "Own website / boutique (~2% payment fee)"},
+    },
+}
 
 BASE_SYSTEM = """You are a pricing mentor for Indian artisans. Reply ONLY with JSON. No expressions, no math, only final computed integers.
 
-Labor rates: beginner=80/hr, intermediate=150/hr(default), experienced=250/hr, expert=400/hr.
+Labor rates (hourly): 1-star=80, 2-star=120, 3-star=150(default), 4-star=250, 5-star=400.
 Craft time DEFAULTS (use ONLY if user did not state hours): crochet teddy=5hr, clay diya=20min/piece, tote bag=45min, macrame=4hr, embroidery=5hr, resin jewelry=1hr, knit=6hr, candle=1hr, soap=1hr, leather wallet=4hr.
 
-CRITICAL RULES — read carefully:
-- If user states hours explicitly ("10 hours", "took me 3 hrs"), USE THAT EXACT NUMBER.
+CRITICAL RULES:
+- If user states hours explicitly, USE THAT EXACT NUMBER.
 - If user states material cost, USE IT AS-IS. Never multiply by quantity.
-- If user states marketplace fee, USE IT AS-IS. Never multiply by quantity.
-- If not, marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
+- marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
 - waste_allowance = round(materials * 0.10)
-- All JSON values must be plain integers. NEVER write expressions like "250*10".
-- "user_planned_price" must be null UNLESS the user explicitly states a price they plan to sell at (e.g. "I want to sell at ₹500", "my price is 300 rs"). NEVER invent or assume a planned price.
+- All JSON values must be plain integers. NEVER write expressions.
+- "user_planned_price" must be null UNLESS user explicitly states a selling price.
+- Only include follow_up_questions if confidence < 0.75 AND the field is GENUINELY missing.
+- Ask MAX 2 questions at a time. NEVER repeat a question already answered.
+- If a field appears anywhere in the conversation (including star answers like "packaging_quality: 3 stars"), do NOT ask about it again.
+- Painting-specific: framing is NOT packaging. Framing goes into materials cost if user mentions the cost.
+- The user prompt may contain answers separated by "|" — read ALL parts before deciding what's missing.
 
-Packaging inference (from user description):
-- No packaging mentioned → ask in missing_info, use 0
-- Poly bag / basic wrap → 8
-- Kraft paper / simple box → 20
-- Gift box with tissue/ribbon → 55
-- Premium branded box → 110
-- Custom described packaging → estimate from description
-
-Transport inference:
-- Local / hand delivery → 25
-- City courier → 60
-- Pan-India courier (default if unspecified) → 90
-- International → 250
+Packaging cost by star: 1=5, 2=10, 3=25, 4=60, 5=120.
 
 {rag_context}
 {cross_session_context}
 
-Output exactly this JSON with all keys present:
-{{"chat_reply":"3-4 sentences. Show labor math explicitly: X hrs × ₹Y/hr = ₹Z. State packaging and transport assumptions. Mention floor price. Warn if planned price is below floor.","product_type":"short name","confidence":0.8,"labor_reasoning":"X hrs (stated/inferred) × ₹Y/hr (skill level) = ₹Z labor cost","costs":{{"materials":0,"labor":0,"packaging":0,"packaging_note":"what you assumed","transport":0,"transport_note":"what you assumed","marketplace_fee":0,"waste_allowance":0}},"floor_price":0,"tiers":{{"basic":{{"price":0,"label":"Basic","note":""}},"standard":{{"price":0,"label":"Standard","note":""}},"premium":{{"price":0,"label":"Premium","note":""}}}},"user_planned_price":null,"missing_info":["specific things that would improve accuracy"],"market_search_query":"2-3 keywords","rag_influence":"one sentence"}}"""
+Output exactly this JSON:
+{{"chat_reply":"2-3 sentences. Show labor math: X hrs x ₹Y/hr = ₹Z. State assumptions. Mention floor price.","product_type":"short name","confidence":0.8,"labor_reasoning":"X hrs x ₹Y/hr = ₹Z","costs":{{"materials":0,"labor":0,"packaging":0,"packaging_note":"assumed or stated","transport":0,"transport_note":"assumed or stated","marketplace_fee":0,"waste_allowance":0}},"floor_price":0,"tiers":{{"basic":{{"price":0,"label":"Basic","note":""}},"standard":{{"price":0,"label":"Standard","note":""}},"premium":{{"price":0,"label":"Premium","note":""}}}},"user_planned_price":null,"missing_info":[],"market_search_query":"2-3 keywords","rag_influence":"one sentence","follow_up_questions":[{{"id":"unique_id","field":"field_name","question":"Short question text","type":"stars|number","unit":"rs/hrs/cm/pieces or null","star_labels":["1-star label","2-star label","3-star label","4-star label","5-star label"]}}]}}
 
-CONVERSATIONAL_SYSTEM = """You are a pricing mentor for Indian artisans. The user is asking a follow-up about their pricing.
+follow_up_questions rules:
+- ONLY ask about info that is GENUINELY MISSING from the user's description. If they mentioned it, do NOT ask.
+- field must be EXACTLY one of these — no other values allowed:
+  * packaging_quality (stars) — only ask if packaging cost/type not mentioned
+  * work_quality (stars) — only ask if quality/finish not mentioned
+  * experience_level (stars) — only ask if experience/skill not mentioned
+  * uniqueness (stars) — only ask if design originality not mentioned
+  * material_cost (number, unit=rs) — only ask if material cost not mentioned
+  * labor_hours (number, unit=hrs) — only ask if time taken not mentioned
+  * quantity (number, unit=pieces) — only ask if quantity not mentioned
+  * size (number, unit=cm) — only ask if size not mentioned
+  * marketplace_platform (stars) — only ask if selling platform not mentioned AND all other costs are already known. This is the LAST question to ask, never the first.
+- star_labels for each field (use EXACTLY these):
+  * marketplace_platform: ["Selling offline/local","Instagram/WhatsApp direct","Meesho/Flipkart","Etsy/Amazon","Own website/boutique"]
+  * packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"]
+  * work_quality: ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"]
+  * experience_level: ["Just started <1yr","Some experience 1-2yr","Intermediate 2-4yr","Experienced 4-8yr","Expert 8+yr"]
+  * uniqueness: ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"]
+- If no questions needed, set follow_up_questions to []
+- NEVER ask about framing, canvas size, painting medium, or anything not in the field list above"""
 
-If purely conversational (explaining a number, asking what something means, clarifying):
+CONVERSATIONAL_SYSTEM = """You are a pricing mentor for Indian artisans.
+
+If purely conversational (explaining a number, asking what something means):
 - Reply ONLY with: {{"chat_reply": "your explanation", "is_conversational": true}}
 
-If the user provides NEW information that changes costs (new packaging, actual hours, material cost update):
-- Reply with the full pricing JSON (same schema as before, all keys required).
+If user provides NEW cost info:
+- Reply with the full pricing JSON (same schema, all keys required, follow_up_questions: []).
 
-Labor math: labor = hours × rate. Always state both numbers in your reply.
-Packaging/transport: if user now describes them, infer the cost and include it."""
+Labor math: hours × rate. Always show both."""
 
 
 def build_system(rag_context: str = "", cross_session_context: str = "") -> str:
@@ -69,13 +121,12 @@ async def call_llm(messages: list, system: str) -> str:
         model=MODEL,
         messages=[{"role": "system", "content": system}] + messages,
         temperature=0.1,
-        max_tokens=800,
+        max_tokens=900,
     )
     return response.choices[0].message.content
 
 
 def sanitize_json(raw: str) -> str:
-    """Evaluate any arithmetic expressions that slipped into JSON values."""
     def eval_expr(m):
         try:
             val = eval(m.group(1), {"__builtins__": {}})
@@ -99,6 +150,39 @@ def extract_json(raw: str) -> Optional[dict]:
         except json.JSONDecodeError:
             pass
     return None
+
+
+def resolve_star_answers(answers: dict) -> str:
+    """
+    Convert star/number answers from the frontend into a plain text description
+    that can be appended to the user message for re-analysis.
+    e.g. {"packaging_quality": 3, "experience_level": 4}
+    → "Packaging quality: 3 stars (Kraft paper box or simple wrap, ₹25).
+       Experience level: 4 stars (Experienced 4-8 yrs, ₹250/hr rate)."
+    """
+    parts = []
+    for field, value in answers.items():
+        if field in STAR_MAPPINGS and isinstance(value, int):
+            mapping = STAR_MAPPINGS[field].get(value, {})
+            label = mapping.get("label", "")
+            val = mapping.get("value", value)
+            if field == "packaging_quality":
+                parts.append(f"Packaging quality: {value} stars ({label}, packaging cost ₹{val})")
+            elif field == "work_quality":
+                parts.append(f"Work quality: {value} stars ({label}, labor rate ₹{val}/hr)")
+            elif field == "experience_level":
+                parts.append(f"Experience level: {value} stars ({label}, labor rate ₹{val}/hr)")
+            elif field == "uniqueness":
+                parts.append(f"Uniqueness: {value} stars ({label})")
+            elif field == "marketplace_platform":
+                fee_pct = mapping.get("fee_pct", 0)
+                parts.append(f"Selling platform: {value} stars ({label}, marketplace fee = {fee_pct}% of subtotal)")
+            else:
+                parts.append(f"{field}: {value} stars ({label})")
+        else:
+            # Numeric answer
+            parts.append(f"{field.replace('_', ' ')}: {value}")
+    return ". ".join(parts) + "." if parts else ""
 
 
 def build_reasoning_reply(parsed: dict) -> str:
@@ -156,7 +240,7 @@ async def analyze_product(user_message: str, history: list = [],
             "chat_reply": "I had trouble processing that. Could you tell me: what you make, material cost, and how long it takes?"
         }
 
-    # Never trust LLM on planned price — only keep it if user explicitly mentioned one
+    # Strip hallucinated planned price
     planned = parsed.get("user_planned_price")
     if planned is not None:
         price_keywords = re.search(
@@ -166,6 +250,8 @@ async def analyze_product(user_message: str, history: list = [],
         )
         if not price_keywords:
             parsed["user_planned_price"] = None
+
+    # Recalculate in Python
     costs = parsed.get("costs", {})
     numeric_costs = {k: v for k, v in costs.items() if isinstance(v, (int, float))}
     floor = sum(numeric_costs.values())
@@ -174,6 +260,13 @@ async def analyze_product(user_message: str, history: list = [],
     tiers.setdefault("basic", {})["price"] = round(floor * 1.13)
     tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
     tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
+
+    # Ensure follow_up_questions exists and is valid
+    questions = parsed.get("follow_up_questions", [])
+    if not isinstance(questions, list):
+        questions = []
+    # Cap at 2
+    parsed["follow_up_questions"] = questions[:2]
 
     # Enrich chat_reply
     llm_reply = parsed.get("chat_reply", "")

@@ -7,7 +7,7 @@ cd backend
 uvicorn main:app --reload --port 8080
 
 cd frontend
-python -m httpserver 3000
+python -m http.server 3000
 ## Folder structure
 
 ```

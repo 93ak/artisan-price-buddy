@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 import uuid
 import re
 import logging
 import traceback
 from services.llm_service import (
     call_llm, extract_json, CONVERSATIONAL_SYSTEM,
-    analyze_product, build_reasoning_reply
+    analyze_product, resolve_star_answers
 )
 from rag.rag_service import retrieve_similar, format_for_prompt
 from db.database import (
@@ -18,7 +18,6 @@ from db.database import (
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
-# Pure question patterns — these and ONLY these get conversational replies
 PURE_QUESTION = re.compile(
     r'^(why|what|how|where|which|who|when|explain|tell me|can you explain|'
     r'what does|what is|what are|what was|how does|how did|how do)'
@@ -27,33 +26,26 @@ PURE_QUESTION = re.compile(
 )
 
 def is_cost_update(message: str) -> bool:
-    """
-    Default to re-analysis UNLESS message is clearly a pure question with no new info.
-    Better to re-analyse too often than miss a cost update.
-    """
     msg = message.strip()
-    # If it ends in ? and starts with a question word and has no numbers/cost words → conversational
     if PURE_QUESTION.match(msg):
-        # But if it contains numbers or currency, still re-analyse
         if not re.search(r'[₹\d]|rs\.?|rupees?|hours?|hrs?|mins?', msg, re.IGNORECASE):
             return False
     return True
 
-def build_combined_description(history: list, new_message: str) -> str:
+def build_combined_description(history: list, extra_messages: list[str]) -> str:
     """
-    Flatten conversation history into a single description for re-analysis.
-    Picks only user messages to avoid LLM hallucination contamination.
+    Flatten all user messages from history + any extra new messages.
+    extra_messages are appended at the end so they override/clarify earlier info.
     """
     user_msgs = [m["content"] for m in history if m["role"] == "user"]
-    user_msgs.append(new_message)
+    user_msgs.extend(extra_messages)
     return " | ".join(user_msgs)
 
-async def run_reanalysis(session_id: str, history: list, new_message: str,
-                         cross_ctx: str) -> dict:
-    """Full re-analysis using all user info gathered so far in the session."""
-    combined = build_combined_description(history, new_message)
+async def run_reanalysis(session_id: str, history: list,
+                         extra_messages: list[str], cross_ctx: str) -> dict:
+    """Full re-analysis. extra_messages are new info not yet in history."""
+    combined = build_combined_description(history, extra_messages)
 
-    # RAG retrieval on combined description
     rag_context = ""
     try:
         retrieved = await retrieve_similar(combined, n_results=5)
@@ -71,7 +63,6 @@ async def run_reanalysis(session_id: str, history: list, new_message: str,
     if "error" in result:
         return None
 
-    # Recalculate in Python
     costs = result.get("costs", {})
     floor = sum(v for v in costs.values() if isinstance(v, (int, float)))
     result["floor_price"] = round(floor)
@@ -80,33 +71,24 @@ async def run_reanalysis(session_id: str, history: list, new_message: str,
     tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
     tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
 
-    # Persist updated analysis
     try:
         save_analysis(session_id, result)
-        update_session_meta(
-            session_id,
-            result.get("product_type", ""),
-            result.get("chat_reply", "")[:120]
-        )
+        update_session_meta(session_id, result.get("product_type", ""), result.get("chat_reply", "")[:120])
     except Exception as e:
         logger.warning(f"DB save failed (non-fatal): {e}")
 
     return result
 
 async def run_conversational(message: str, history: list, cross_ctx: str) -> str:
-    """Handle a pure question/explanation without touching pricing."""
     recent = history[-6:]
     messages = recent + [{"role": "user", "content": message}]
     system = CONVERSATIONAL_SYSTEM + (f"\n\n{cross_ctx}" if cross_ctx else "")
     raw = await call_llm(messages, system=system)
-
     parsed = extract_json(raw)
     if parsed:
         reply = parsed.get("chat_reply", "")
         if reply:
             return reply.strip()
-
-    # Strip raw JSON if it leaked
     clean = raw.strip()
     if clean.startswith("{"):
         m = re.search(r'"chat_reply"\s*:\s*"((?:[^"\\]|\\.)*)"', clean)
@@ -115,8 +97,9 @@ async def run_conversational(message: str, history: list, cross_ctx: str) -> str
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: Optional[str] = ""
     session_id: Optional[str] = None
+    question_answers: Optional[Dict[str, Any]] = None
 
 
 @router.post("")
@@ -125,8 +108,6 @@ async def chat(req: ChatRequest):
     prior = get_session_messages(session_id)
     history = [{"role": m["role"], "content": m["content"]} for m in prior]
 
-    save_message(session_id, "user", req.message)
-
     cross_ctx = ""
     try:
         cross_ctx = build_cross_session_context(limit=2)
@@ -134,10 +115,16 @@ async def chat(req: ChatRequest):
         pass
 
     try:
-        if is_cost_update(req.message):
-            # User gave new cost info → full re-analysis with everything we know
-            logger.info(f"Cost update detected in: '{req.message[:60]}' — running reanalysis")
-            result = await run_reanalysis(session_id, history, req.message, cross_ctx)
+        # ── Structured question answers ────────────────────────────────────
+        if req.question_answers:
+            answer_text = resolve_star_answers(req.question_answers)
+            full_message = f"{req.message.strip()} {answer_text}".strip() if req.message else answer_text
+
+            logger.info(f"Question answers: {req.question_answers} → '{answer_text}'")
+            save_message(session_id, "user", full_message)
+
+            # Pass answer_text as extra_message — NOT yet in history
+            result = await run_reanalysis(session_id, history, [full_message], cross_ctx)
 
             if result:
                 reply = result.get("chat_reply", "I've updated your pricing.")
@@ -146,14 +133,34 @@ async def chat(req: ChatRequest):
                     "session_id": session_id,
                     "reply": reply,
                     "type": "reanalysis",
-                    "data": result
+                    "data": result,
+                    "follow_up_questions": result.get("follow_up_questions", [])
                 }
-            # Reanalysis failed — fall through to conversational
 
-        # Pure question/explanation
-        reply = await run_conversational(req.message, history, cross_ctx)
+        # ── Regular text message ───────────────────────────────────────────
+        msg = req.message.strip() if req.message else ""
+        if not msg:
+            return {"session_id": session_id, "reply": "Please describe your product.", "type": "conversational", "follow_up_questions": []}
+
+        save_message(session_id, "user", msg)
+
+        if is_cost_update(msg):
+            logger.info(f"Cost update: '{msg[:60]}' — reanalysing")
+            result = await run_reanalysis(session_id, history, [msg], cross_ctx)
+            if result:
+                reply = result.get("chat_reply", "I've updated your pricing.")
+                save_message(session_id, "assistant", reply)
+                return {
+                    "session_id": session_id,
+                    "reply": reply,
+                    "type": "reanalysis",
+                    "data": result,
+                    "follow_up_questions": result.get("follow_up_questions", [])
+                }
+
+        reply = await run_conversational(msg, history, cross_ctx)
         save_message(session_id, "assistant", reply)
-        return {"session_id": session_id, "reply": reply, "type": "conversational"}
+        return {"session_id": session_id, "reply": reply, "type": "conversational", "follow_up_questions": []}
 
     except Exception as e:
         logger.error(f"Chat error: {e}\n{traceback.format_exc()}")
