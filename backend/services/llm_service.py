@@ -59,16 +59,19 @@ Craft time DEFAULTS (use ONLY if user did not state hours): crochet teddy=5hr, c
 
 CRITICAL RULES:
 - If user states hours explicitly, USE THAT EXACT NUMBER.
-- If user states material cost, USE IT AS-IS. Never multiply by quantity.
+- If user states material cost, USE IT AS-IS. Never multiply by quantity.\
+- The prompt lists FACTS as "field: value" pairs. Every fact explicitly given is FINAL — never substitute a default or an earlier guess for it, even if an earlier part of the text seems to suggest otherwise. The LAST stated value for any field always wins.
 - marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
 - waste_allowance = round(materials * 0.10)
 - All JSON values must be plain integers. NEVER write expressions.
 - "user_planned_price" must be null UNLESS user explicitly states a selling price.
+- chat_reply must be SHORT: max 3 sentences, no step-by-step math walkthrough (the UI shows the cost breakdown separately). Never start sentences with "We will also".
 - Only include follow_up_questions if confidence < 0.75 AND the field is GENUINELY missing.
-- Ask MAX 2 questions at a time. NEVER repeat a question already answered.
-- If a field appears anywhere in the conversation (including star answers like "packaging_quality: 3 stars"), do NOT ask about it again.
+- Ask MAX 2 questions at a time. NEVER repeat a question already answered, especially from the intial prompt.
+- If a field appears anywhere in the conversation (including star answers like "packaging_quality: 3 stars"), do NOT ask about it again DO NOT ask about soemthing you already got the answer for..
 - Painting-specific: framing is NOT packaging. Framing goes into materials cost if user mentions the cost.
-- The user prompt may contain answers separated by "|" — read ALL parts before deciding what's missing.
+- The user prompt may arrive as a FACTS list (one fact per line) — read EVERY line before deciding what's missing or what value to use.
+- Most product descriptions only mention 2-3 of the 5 star fields (packaging_quality, work_quality, experience_level, uniqueness, marketplace_platform). Check all 5 against the FACTS list — if a field is genuinely absent, it almost certainly belongs in follow_up_questions (subject to the MAX 2 cap).
 
 Packaging cost by star: 1=5, 2=10, 3=25, 4=60, 5=120.
 
@@ -80,6 +83,8 @@ Output exactly this JSON:
 
 follow_up_questions rules:
 - ONLY ask about info that is GENUINELY MISSING from the user's description. If they mentioned it, do NOT ask.
+- do not ask something that you already know from the user. DO NOT repeat questions.
+- Calculate labour cost based on their experience and type of product. if mentioned once, never ask again. if not mentioned experience, ASK.
 - field must be EXACTLY one of these — no other values allowed:
   * packaging_quality (stars) — only ask if packaging cost/type not mentioned
   * work_quality (stars) — only ask if quality/finish not mentioned
@@ -268,13 +273,10 @@ async def analyze_product(user_message: str, history: list = [],
     # Cap at 2
     parsed["follow_up_questions"] = questions[:2]
 
-    # Enrich chat_reply
-    llm_reply = parsed.get("chat_reply", "")
-    python_reply = build_reasoning_reply(parsed)
-    if len(llm_reply) < 100:
-        parsed["chat_reply"] = python_reply
-    elif "floor price" not in llm_reply.lower():
-        parsed["chat_reply"] = llm_reply + " " + python_reply
+    # Always use the deterministic, concise summary for pricing replies.
+    # The LLM's own chat_reply is unreliable in length (small model rambles),
+    # so we never surface it directly here — just build it from the numbers.
+    parsed["chat_reply"] = build_reasoning_reply(parsed)
 
     return parsed
 

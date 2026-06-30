@@ -34,12 +34,19 @@ def is_cost_update(message: str) -> bool:
 
 def build_combined_description(history: list, extra_messages: list[str]) -> str:
     """
-    Flatten all user messages from history + any extra new messages.
-    extra_messages are appended at the end so they override/clarify earlier info.
+    Flatten all user messages from history + any extra new messages into a
+    FACTS list. Later facts are listed last and are explicitly marked as
+    overriding any earlier conflicting fact, since the LLM otherwise tends
+    to fall back to its own defaults instead of using the latest answer.
     """
     user_msgs = [m["content"] for m in history if m["role"] == "user"]
     user_msgs.extend(extra_messages)
-    return " | ".join(user_msgs)
+    numbered = "\n".join(f"- {m}" for m in user_msgs if m and m.strip())
+    return (
+        "FACTS (each line is a fact already given by the user; later lines "
+        "override earlier ones on the same field; treat ALL of them as final, "
+        "do not re-guess any value covered below):\n" + numbered
+    )
 
 async def run_reanalysis(session_id: str, history: list,
                          extra_messages: list[str], cross_ctx: str) -> dict:
@@ -100,6 +107,7 @@ class ChatRequest(BaseModel):
     message: Optional[str] = ""
     session_id: Optional[str] = None
     question_answers: Optional[Dict[str, Any]] = None
+    user_summary: Optional[str] = None  # human-readable summary of answers, for saving to chat history
 
 
 @router.post("")
@@ -120,8 +128,11 @@ async def chat(req: ChatRequest):
             answer_text = resolve_star_answers(req.question_answers)
             full_message = f"{req.message.strip()} {answer_text}".strip() if req.message else answer_text
 
+            # Save human-readable summary to chat history (what the user sees)
+            # Falls back to technical text if no summary provided
+            display_message = req.user_summary or full_message
             logger.info(f"Question answers: {req.question_answers} → '{answer_text}'")
-            save_message(session_id, "user", full_message)
+            save_message(session_id, "user", display_message)
 
             # Pass answer_text as extra_message — NOT yet in history
             result = await run_reanalysis(session_id, history, [full_message], cross_ctx)
