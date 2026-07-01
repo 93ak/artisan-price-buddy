@@ -10,7 +10,12 @@ load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
-MODEL = "llama-3.1-8b-instant"
+MODEL = "qwen/qwen3-32b"
+
+
+def strip_think(raw: str) -> str:
+    """Qwen3 models emit <think>…</think> before their actual reply. Strip it."""
+    return re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=re.IGNORECASE).strip()
 
 # ── Star rating → value mappings ──────────────────────────────────────────────
 # Used to convert frontend star inputs into concrete values for re-analysis
@@ -52,6 +57,9 @@ STAR_MAPPINGS = {
     },
 }
 
+# Question text + star labels used when WE synthesize a follow-up question
+# ourselves (i.e. the profile says a field is missing, regardless of what
+# the LLM did or didn't ask). Keep in sync with the wording in BASE_SYSTEM.
 BASE_SYSTEM = """You are a pricing mentor for Indian artisans. Reply ONLY with JSON. No expressions, no math, only final computed integers.
 
 Labor rates (hourly): 1-star=80, 2-star=120, 3-star=150(default), 4-star=250, 5-star=400.
@@ -59,7 +67,7 @@ Craft time DEFAULTS (use ONLY if user did not state hours): crochet teddy=5hr, c
 
 CRITICAL RULES:
 - If user states hours explicitly, USE THAT EXACT NUMBER.
-- If user states material cost, USE IT AS-IS. Never multiply by quantity.\
+- If user states material cost, USE IT AS-IS. Never multiply by quantity.
 - The prompt lists FACTS as "field: value" pairs. Every fact explicitly given is FINAL — never substitute a default or an earlier guess for it, even if an earlier part of the text seems to suggest otherwise. The LAST stated value for any field always wins.
 - marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
 - waste_allowance = round(materials * 0.10)
@@ -67,11 +75,11 @@ CRITICAL RULES:
 - "user_planned_price" must be null UNLESS user explicitly states a selling price.
 - chat_reply must be SHORT: max 3 sentences, no step-by-step math walkthrough (the UI shows the cost breakdown separately). Never start sentences with "We will also".
 - Only include follow_up_questions if confidence < 0.75 AND the field is GENUINELY missing.
-- Ask MAX 2 questions at a time. NEVER repeat a question already answered, especially from the intial prompt.
-- If a field appears anywhere in the conversation (including star answers like "packaging_quality: 3 stars"), do NOT ask about it again DO NOT ask about soemthing you already got the answer for..
+- Ask MAX 2 questions at a time. NEVER repeat a question already answered.
+- If a field appears anywhere in the conversation (including star answers), do NOT ask about it again.
 - Painting-specific: framing is NOT packaging. Framing goes into materials cost if user mentions the cost.
 - The user prompt may arrive as a FACTS list (one fact per line) — read EVERY line before deciding what's missing or what value to use.
-- Most product descriptions only mention 2-3 of the 5 star fields (packaging_quality, work_quality, experience_level, uniqueness, marketplace_platform). Check all 5 against the FACTS list — if a field is genuinely absent, it almost certainly belongs in follow_up_questions (subject to the MAX 2 cap).
+- marketplace_platform is always the LAST question to ask — only after the core pricing fields are known.
 
 Packaging cost by star: 1=5, 2=10, 3=25, 4=60, 5=120.
 
@@ -79,30 +87,20 @@ Packaging cost by star: 1=5, 2=10, 3=25, 4=60, 5=120.
 {cross_session_context}
 
 Output exactly this JSON:
-{{"chat_reply":"2-3 sentences. Show labor math: X hrs x ₹Y/hr = ₹Z. State assumptions. Mention floor price.","product_type":"short name","confidence":0.8,"labor_reasoning":"X hrs x ₹Y/hr = ₹Z","costs":{{"materials":0,"labor":0,"packaging":0,"packaging_note":"assumed or stated","transport":0,"transport_note":"assumed or stated","marketplace_fee":0,"waste_allowance":0}},"floor_price":0,"tiers":{{"basic":{{"price":0,"label":"Basic","note":""}},"standard":{{"price":0,"label":"Standard","note":""}},"premium":{{"price":0,"label":"Premium","note":""}}}},"user_planned_price":null,"missing_info":[],"market_search_query":"2-3 keywords","rag_influence":"one sentence","follow_up_questions":[{{"id":"unique_id","field":"field_name","question":"Short question text","type":"stars|number","unit":"rs/hrs/cm/pieces or null","star_labels":["1-star label","2-star label","3-star label","4-star label","5-star label"]}}]}}
+{{"chat_reply":"2-3 sentences. Show labor math: X hrs x ₹Y/hr = ₹Z. State assumptions. Mention floor price.","product_type":"short name","confidence":0.8,"labor_reasoning":"X hrs x ₹Y/hr = ₹Z","costs":{{"materials":0,"labor":0,"packaging":0,"packaging_note":"assumed or stated","transport":0,"transport_note":"assumed or stated","marketplace_fee":0,"waste_allowance":0}},"floor_price":0,"tiers":{{"basic":{{"price":0,"label":"Basic","note":""}},"standard":{{"price":0,"label":"Standard","note":""}},"premium":{{"price":0,"label":"Premium","note":""}}}},"user_planned_price":null,"missing_info":[],"market_search_query":"2-3 keywords","rag_influence":"one sentence","follow_up_questions":[{{"id":"unique_id","field":"field_name","question":"Short question text","type":"stars|number|choice|text","unit":"rs/hrs/cm/pieces or null","star_labels":["1-star label","2-star label","3-star label","4-star label","5-star label"],"options":["Option A","Option B","Option C"]}}]}}
 
 follow_up_questions rules:
-- ONLY ask about info that is GENUINELY MISSING from the user's description. If they mentioned it, do NOT ask.
-- do not ask something that you already know from the user. DO NOT repeat questions.
-- Calculate labour cost based on their experience and type of product. if mentioned once, never ask again. if not mentioned experience, ASK.
-- field must be EXACTLY one of these — no other values allowed:
-  * packaging_quality (stars) — only ask if packaging cost/type not mentioned
-  * work_quality (stars) — only ask if quality/finish not mentioned
-  * experience_level (stars) — only ask if experience/skill not mentioned
-  * uniqueness (stars) — only ask if design originality not mentioned
-  * material_cost (number, unit=rs) — only ask if material cost not mentioned
-  * labor_hours (number, unit=hrs) — only ask if time taken not mentioned
-  * quantity (number, unit=pieces) — only ask if quantity not mentioned
-  * size (number, unit=cm) — only ask if size not mentioned
-  * marketplace_platform (stars) — only ask if selling platform not mentioned AND all other costs are already known. This is the LAST question to ask, never the first.
-- star_labels for each field (use EXACTLY these):
-  * marketplace_platform: ["Selling offline/local","Instagram/WhatsApp direct","Meesho/Flipkart","Etsy/Amazon","Own website/boutique"]
-  * packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"]
-  * work_quality: ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"]
-  * experience_level: ["Just started <1yr","Some experience 1-2yr","Intermediate 2-4yr","Experienced 4-8yr","Expert 8+yr"]
-  * uniqueness: ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"]
+- Ask about ANYTHING genuinely missing that would improve pricing accuracy.
+- Be contextual and smart: for a painting ask size and medium; for crochet ask yarn weight; for candles ask wax type and burn time; for jewellery ask metal or material and if handmade vs cast; for pottery ask if kiln-fired; etc.
+- Use the right type for the question:
+  * "stars" → for quality/experience/uniqueness scales (5 levels). Must include star_labels (5 items). Set options to [].
+  * "number" → for measurable inputs like size, hours, quantity, cost. Set star_labels and options to [].
+  * "choice" → for selecting from a fixed list of named options (e.g. art style, medium, occasion). Include options array (2-6 strings). Set star_labels to [].
+  * "text" → for short open-ended answers where a fixed list doesn't fit. Set star_labels and options to [].
+- The 5 standard fields (packaging_quality, work_quality, experience_level, uniqueness, marketplace_platform) are valid choices but NOT mandatory — only include them if they're genuinely missing AND would materially affect the price calculation.
+- field name must be a short snake_case string describing what you're asking (e.g. "canvas_size", "art_style", "yarn_type", "occasion").
 - If no questions needed, set follow_up_questions to []
-- NEVER ask about framing, canvas size, painting medium, or anything not in the field list above"""
+- NEVER ask about the same field twice across conversation turns."""
 
 CONVERSATIONAL_SYSTEM = """You are a pricing mentor for Indian artisans.
 
@@ -124,11 +122,11 @@ def build_system(rag_context: str = "", cross_session_context: str = "") -> str:
 async def call_llm(messages: list, system: str) -> str:
     response = await client.chat.completions.create(
         model=MODEL,
-        messages=[{"role": "system", "content": system}] + messages,
+        messages=[{"role": "system", "content": "/no_think\n\n" + system}] + messages,
         temperature=0.1,
-        max_tokens=900,
+        max_tokens=1200,
     )
-    return response.choices[0].message.content
+    return strip_think(response.choices[0].message.content)
 
 
 def sanitize_json(raw: str) -> str:
@@ -190,6 +188,25 @@ def resolve_star_answers(answers: dict) -> str:
     return ". ".join(parts) + "." if parts else ""
 
 
+
+
+def reconcile_follow_up_questions(llm_questions: list, known_profile: dict) -> list:
+    """
+    Deduplication-only pass: drop any question whose field is already in the
+    session profile (answered in a prior turn). No longer enforces a fixed
+    field list — the LLM is free to ask contextual questions for any product.
+    Caps at 2 questions.
+    """
+    if not isinstance(llm_questions, list):
+        return []
+    answered = set(known_profile.keys())
+    kept = [
+        q for q in llm_questions
+        if isinstance(q, dict) and q.get("field") and q["field"] not in answered
+    ]
+    return kept[:2]
+
+
 def build_reasoning_reply(parsed: dict) -> str:
     costs = parsed.get("costs", {})
     floor = parsed.get("floor_price", 0)
@@ -231,8 +248,26 @@ def build_reasoning_reply(parsed: dict) -> str:
     return " ".join(lines)
 
 
+def infer_profile_updates_from_result(result: dict) -> dict:
+    """
+    After an analysis, pull out anything the LLM effectively confirmed as
+    "known" so the profile stays accurate even when info arrived as free
+    text rather than a structured star answer.
+    """
+    updates = {}
+    if result.get("product_type"):
+        updates["product_type"] = result["product_type"]
+
+    costs = result.get("costs", {})
+    if str(costs.get("packaging_note", "")).strip().lower() == "stated":
+        updates["packaging_quality"] = "given"
+
+    return updates
+
+
 async def analyze_product(user_message: str, history: list = [],
-                          rag_context: str = "", cross_session_context: str = "") -> dict:
+                          rag_context: str = "", cross_session_context: str = "",
+                          known_profile: Optional[dict] = None) -> dict:
     system = build_system(rag_context, cross_session_context)
     messages = history + [{"role": "user", "content": user_message}]
     raw = await call_llm(messages, system)
@@ -266,12 +301,15 @@ async def analyze_product(user_message: str, history: list = [],
     tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
     tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
 
-    # Ensure follow_up_questions exists and is valid
-    questions = parsed.get("follow_up_questions", [])
-    if not isinstance(questions, list):
-        questions = []
-    # Cap at 2
-    parsed["follow_up_questions"] = questions[:2]
+    # ── Deterministic follow-up question reconciliation ────────────────────
+    # Instead of trusting the LLM's own sense of "what's missing", check its
+    # proposed questions against the session profile (the actual fact sheet
+    # of what this session already knows) and correct accordingly.
+    llm_questions = parsed.get("follow_up_questions", [])
+    if known_profile is not None:
+        parsed["follow_up_questions"] = reconcile_follow_up_questions(llm_questions, known_profile)
+    else:
+        parsed["follow_up_questions"] = llm_questions[:2] if isinstance(llm_questions, list) else []
 
     # Always use the deterministic, concise summary for pricing replies.
     # The LLM's own chat_reply is unreliable in length (small model rambles),

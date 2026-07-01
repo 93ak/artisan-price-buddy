@@ -12,7 +12,8 @@ from services.llm_service import (
 from rag.rag_service import retrieve_similar, format_for_prompt
 from db.database import (
     save_message, get_session_messages, save_analysis,
-    update_session_meta, build_cross_session_context
+    update_session_meta, build_cross_session_context,
+    get_profile, update_profile
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -33,24 +34,13 @@ def is_cost_update(message: str) -> bool:
     return True
 
 def build_combined_description(history: list, extra_messages: list[str]) -> str:
-    """
-    Flatten all user messages from history + any extra new messages into a
-    FACTS list. Later facts are listed last and are explicitly marked as
-    overriding any earlier conflicting fact, since the LLM otherwise tends
-    to fall back to its own defaults instead of using the latest answer.
-    """
     user_msgs = [m["content"] for m in history if m["role"] == "user"]
     user_msgs.extend(extra_messages)
-    numbered = "\n".join(f"- {m}" for m in user_msgs if m and m.strip())
-    return (
-        "FACTS (each line is a fact already given by the user; later lines "
-        "override earlier ones on the same field; treat ALL of them as final, "
-        "do not re-guess any value covered below):\n" + numbered
-    )
+    return " | ".join(user_msgs)
 
 async def run_reanalysis(session_id: str, history: list,
-                         extra_messages: list[str], cross_ctx: str) -> dict:
-    """Full re-analysis. extra_messages are new info not yet in history."""
+                         extra_messages: list[str], cross_ctx: str,
+                         known_profile: dict) -> dict:
     combined = build_combined_description(history, extra_messages)
 
     rag_context = ""
@@ -64,19 +54,19 @@ async def run_reanalysis(session_id: str, history: list,
     result = await analyze_product(
         combined,
         rag_context=rag_context,
-        cross_session_context=cross_ctx
+        cross_session_context=cross_ctx,
+        known_profile=known_profile  # ← pass profile so labor/fees use correct values
     )
 
     if "error" in result:
         return None
 
-    costs = result.get("costs", {})
-    floor = sum(v for v in costs.values() if isinstance(v, (int, float)))
-    result["floor_price"] = round(floor)
+    # Floor is already recalculated inside analyze_product, but recalc tiers too
+    floor = result.get("floor_price", 0)
     tiers = result.setdefault("tiers", {})
-    tiers.setdefault("basic", {})["price"] = round(floor * 1.13)
-    tiers.setdefault("standard", {})["price"] = round(floor * 1.35)
-    tiers.setdefault("premium", {})["price"] = round(floor * 1.85)
+    tiers["basic"]    = {"price": round(floor * 1.13), "label": "Basic",    "note": "Covers costs + 13% margin"}
+    tiers["standard"] = {"price": round(floor * 1.35), "label": "Standard", "note": "Healthy margin, market competitive"}
+    tiers["premium"]  = {"price": round(floor * 1.85), "label": "Premium",  "note": "For boutique / gift buyers"}
 
     try:
         save_analysis(session_id, result)
@@ -107,7 +97,7 @@ class ChatRequest(BaseModel):
     message: Optional[str] = ""
     session_id: Optional[str] = None
     question_answers: Optional[Dict[str, Any]] = None
-    user_summary: Optional[str] = None  # human-readable summary of answers, for saving to chat history
+    user_summary: Optional[str] = None
 
 
 @router.post("")
@@ -125,18 +115,18 @@ async def chat(req: ChatRequest):
     try:
         # ── Structured question answers ────────────────────────────────────
         if req.question_answers:
+            # Save ALL answers to profile immediately — this is what prevents re-asking
+            profile_updates = {k: v for k, v in req.question_answers.items() if v is not None}
+            profile = update_profile(session_id, profile_updates)
+            logger.info(f"Profile updated with: {profile_updates} → {profile}")
+
             answer_text = resolve_star_answers(req.question_answers)
             full_message = f"{req.message.strip()} {answer_text}".strip() if req.message else answer_text
-
-            # Save human-readable summary to chat history (what the user sees)
-            # Falls back to technical text if no summary provided
             display_message = req.user_summary or full_message
-            logger.info(f"Question answers: {req.question_answers} → '{answer_text}'")
+
             save_message(session_id, "user", display_message)
 
-            # Pass answer_text as extra_message — NOT yet in history
-            result = await run_reanalysis(session_id, history, [full_message], cross_ctx)
-
+            result = await run_reanalysis(session_id, history, [full_message], cross_ctx, profile)
             if result:
                 reply = result.get("chat_reply", "I've updated your pricing.")
                 save_message(session_id, "assistant", reply)
@@ -148,16 +138,21 @@ async def chat(req: ChatRequest):
                     "follow_up_questions": result.get("follow_up_questions", [])
                 }
 
+            fail_reply = "I got your answers but had trouble recalculating. Please try again."
+            save_message(session_id, "assistant", fail_reply)
+            return {"session_id": session_id, "reply": fail_reply, "type": "conversational", "follow_up_questions": []}
+
         # ── Regular text message ───────────────────────────────────────────
         msg = req.message.strip() if req.message else ""
         if not msg:
             return {"session_id": session_id, "reply": "Please describe your product.", "type": "conversational", "follow_up_questions": []}
 
         save_message(session_id, "user", msg)
+        profile = get_profile(session_id)
 
         if is_cost_update(msg):
             logger.info(f"Cost update: '{msg[:60]}' — reanalysing")
-            result = await run_reanalysis(session_id, history, [msg], cross_ctx)
+            result = await run_reanalysis(session_id, history, [msg], cross_ctx, profile)
             if result:
                 reply = result.get("chat_reply", "I've updated your pricing.")
                 save_message(session_id, "assistant", reply)

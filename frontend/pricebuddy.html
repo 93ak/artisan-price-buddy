@@ -108,6 +108,40 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 .num-input:focus { border-color: #7a1212; }
 .num-unit { font-size: 14px; color: #888; font-weight: 500; }
 
+/* Choice card (multi-option select) */
+.choice-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.choice-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid #e8d8d8;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fff;
+  font-size: 13px;
+  color: #333;
+  transition: all 0.12s;
+  user-select: none;
+}
+.choice-opt:hover { border-color: #7a1212; background: #fdf5f5; }
+.choice-opt.selected { border-color: #7a1212; background: #fbeeee; color: #7a1212; font-weight: 600; }
+.choice-opt .choice-num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #f0e8e8;
+  color: #7a1212;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.choice-opt.selected .choice-num { background: #7a1212; color: #fff; }
+
 /* Submit button inside question card */
 .fq-submit {
   align-self: flex-start;
@@ -195,7 +229,7 @@ textarea:focus { border-color: #7a1212; background: #fff; }
 </style>
 </head>
 <body>
-<!--
+
 <div class="sidebar">
   <div class="sidebar-head">
     <div class="sidebar-logo"><i class="ti ti-tag"></i> Price Buddy</div>
@@ -208,7 +242,6 @@ textarea:focus { border-color: #7a1212; background: #fff; }
   <div class="sidebar-section">Recent</div>
   <div id="session-list"><div class="sidebar-empty">No sessions yet</div></div>
 </div>
--->
 
 <div class="main">
   <div class="topbar">
@@ -351,7 +384,14 @@ async function startAnalysis() {
     const r = await fetch(API + "/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: prompt, session_id: null })
+      body: JSON.stringify({
+        description: prompt,
+        session_id: null,
+        product_name: name,
+        material_cost: cost,
+        experience: exp,
+        quantity: qty
+      })
     });
     removeTyping();
     if (!r.ok) {
@@ -436,8 +476,45 @@ function renderFollowUpQuestions(questions) {
     card.className = "fq-card";
     const uid = q.field; // field name is always unique per question set
 
-    if (q.type === "stars") {
-      const labels = getStarLabels(q.field, q.star_labels);
+    if (q.type === "stars" && (q.field === "packaging_quality" || q.field === "marketplace_platform")) {
+      const labels = q.star_labels && q.star_labels.length ? q.star_labels : getStarLabels(q.field, []);
+      card.innerHTML = `
+        <div>
+          <div class="fq-question">${q.question}</div>
+          <div class="fq-sub">Select one option</div>
+        </div>
+        <div class="choice-grid" id="choice-${uid}">
+          ${labels.map((label, i) => `
+            <div class="choice-opt" data-field="${uid}" data-val="${i+1}" onclick="setChoice('${uid}', ${i+1}, this)">
+              <span class="choice-num">${i+1}</span>
+              ${label}
+            </div>`).join("")}
+        </div>`;
+
+    } else if (q.type === "choice" && q.options && q.options.length) {
+      card.innerHTML = `
+        <div>
+          <div class="fq-question">${q.question}</div>
+          <div class="fq-sub">Select one option</div>
+        </div>
+        <div class="choice-grid" id="choice-${uid}">
+          ${q.options.map(label => `
+            <div class="choice-opt" data-uid="${uid}" data-val="${label.replace(/"/g,'&quot;')}" onclick="setChoiceText(this)">
+              ${label}
+            </div>`).join("")}
+        </div>`;
+
+    } else if (q.type === "text") {
+      card.innerHTML = `
+        <div>
+          <div class="fq-question">${q.question}</div>
+        </div>
+        <input class="num-input" type="text" style="max-width:100%;font-size:14px;"
+               placeholder="Type your answer…"
+               oninput="setTextAnswer('${uid}', this.value)"/>`;
+
+    } else if (q.type === "stars") {
+      const labels = q.star_labels && q.star_labels.length ? q.star_labels : getStarLabels(q.field, []);
       card.innerHTML = `
         <div>
           <div class="fq-question">${q.question}</div>
@@ -446,7 +523,7 @@ function renderFollowUpQuestions(questions) {
         <div>
           <div class="star-row" id="stars-${uid}">
             ${[1,2,3,4,5].map(n =>
-              `<span class="star" data-n="${n}" data-field="${uid}" onclick="setStar('${uid}',${n})">★</span>`
+              `<span class="star" data-n="${n}" data-field="${uid}" onclick="setStar('${uid}',${n},${JSON.stringify(labels)})">★</span>`
             ).join("")}
           </div>
           <div class="star-label" id="star-label-${uid}">—</div>
@@ -477,15 +554,33 @@ function renderFollowUpQuestions(questions) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function setStar(uid, val) {
+function setStar(uid, val, labels) {
   window._fqAnswers[uid] = val;
-  // Light up stars 1..val, dim val+1..5
   document.querySelectorAll(`#stars-${uid} .star`).forEach(s => {
     s.classList.toggle("lit", parseInt(s.dataset.n) <= val);
   });
-  const labels = getStarLabels(uid, []);
   const labelEl = document.getElementById(`star-label-${uid}`);
-  if (labelEl) labelEl.textContent = labels[val - 1] || `${val} star${val > 1 ? 's' : ''}`;
+  if (labelEl) labelEl.textContent = (labels && labels[val-1]) || `${val} star${val > 1 ? 's' : ''}`;
+}
+
+function setChoice(uid, val, el) {
+  window._fqAnswers[uid] = val;
+  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => {
+    opt.classList.toggle("selected", opt === el);
+  });
+}
+
+function setChoiceText(el) {
+  const uid = el.dataset.uid;
+  const val = el.dataset.val;
+  window._fqAnswers[uid] = val;
+  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => {
+    opt.classList.toggle("selected", opt === el);
+  });
+}
+
+function setTextAnswer(uid, val) {
+  window._fqAnswers[uid] = val.trim() || null;
 }
 
 function setNum(uid, val) {
@@ -509,7 +604,14 @@ async function submitAnswers(btn) {
 
   // Build human-readable summary and show it immediately in chat
   const summary = filled.map(([k, v]) => {
-    const labels = STAR_LABELS[k];
+    const STAR_LABELS_LOCAL = {
+      packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"],
+      work_quality: ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"],
+      experience_level: ["Just started <1yr","Some experience 1-2yr","Intermediate 2-4yr","Experienced 4-8yr","Expert 8+yr"],
+      uniqueness: ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"],
+      marketplace_platform: ["Selling offline/local","Instagram/WhatsApp direct","Meesho/Flipkart","Etsy/Amazon","Own website/boutique"],
+    };
+    const labels = STAR_LABELS_LOCAL[k];
     if (labels && typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 5) {
       return `${k.replace(/_/g," ")}: ${v}★ — ${labels[v-1]}`;
     }

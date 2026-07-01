@@ -58,6 +58,28 @@ def get_collection():
     return _collection
 
 
+def _reset_collection():
+    """
+    Drop and recreate the collection. Used when the persisted on-disk index
+    is corrupted or incompatible with the installed chromadb version
+    (symptom: cryptic errors like "object of type 'int' has no len()" from
+    collection.count()/query()). Caller is responsible for re-indexing after.
+    """
+    global _collection
+    logger.warning("RAG: collection appears corrupted/incompatible — resetting it.")
+    client = get_client()
+    try:
+        client.delete_collection(COLLECTION_NAME)
+    except Exception:
+        pass
+    _collection = client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"},
+        embedding_function=None
+    )
+    return _collection
+
+
 def _product_to_text(p: dict) -> str:
     return (
         f"{p['description']}. "
@@ -70,7 +92,12 @@ def _product_to_text(p: dict) -> str:
 
 async def index_dataset(force: bool = False) -> dict:
     collection = get_collection()
-    existing = collection.count()
+    try:
+        existing = collection.count()
+    except Exception as e:
+        logger.warning(f"RAG: collection.count() failed ({e}) — resetting collection.")
+        collection = _reset_collection()
+        existing = 0
 
     if existing >= len(ARTISAN_PRODUCTS) and not force:
         logger.info(f"RAG: Already indexed {existing} products, skipping.")
@@ -106,19 +133,42 @@ async def index_dataset(force: bool = False) -> dict:
 async def retrieve_similar(query: str, n_results: int = 5,
                            category_filter: str = None) -> list[dict]:
     collection = get_collection()
-    if collection.count() == 0:
-        await index_dataset()
+    try:
+        count = collection.count()
+    except Exception as e:
+        logger.warning(f"RAG: collection.count() failed ({e}) — resetting and re-indexing.")
+        await index_dataset(force=True)
+        collection = get_collection()
+        count = collection.count()
 
-    n = min(n_results, collection.count())
+    if count == 0:
+        await index_dataset()
+        collection = get_collection()
+        count = collection.count()
+
+    n = min(n_results, count)
+    if n <= 0:
+        return []
     where = {"category": category_filter} if category_filter else None
     query_embedding = embed([query])
 
-    results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=n,
-        where=where,
-        include=["documents", "metadatas", "distances"]
-    )
+    try:
+        results = collection.query(
+            query_embeddings=query_embedding,
+            n_results=n,
+            where=where,
+            include=["documents", "metadatas", "distances"]
+        )
+    except Exception as e:
+        logger.warning(f"RAG: query failed ({e}) — resetting, re-indexing, retrying once.")
+        await index_dataset(force=True)
+        collection = get_collection()
+        results = collection.query(
+            query_embeddings=query_embedding,
+            n_results=n,
+            where=where,
+            include=["documents", "metadatas", "distances"]
+        )
 
     retrieved = []
     for i in range(len(results["ids"][0])):

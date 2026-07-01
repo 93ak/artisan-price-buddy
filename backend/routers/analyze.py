@@ -7,7 +7,7 @@ import logging
 from services.llm_service import analyze_product, check_llm_health
 from services.scraper import research_market
 from rag.rag_service import retrieve_similar, format_for_prompt
-from db.database import save_message, save_analysis, update_session_meta, build_cross_session_context
+from db.database import save_message, save_analysis, update_session_meta, build_cross_session_context, get_profile, update_profile
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -59,11 +59,26 @@ async def analyze(req: AnalyzeRequest):
             logger.warning(f"Cross-session context failed (non-fatal): {e}")
 
         # ── Step 3: LLM analysis ──────────────────────────────────────────
+        # Seed profile from structured form fields
+        seed = {}
+        if hasattr(req, 'product_name') and req.product_name:
+            seed["product_name"] = req.product_name
+        if hasattr(req, 'material_cost') and req.material_cost:
+            seed["material_cost"] = req.material_cost
+        if hasattr(req, 'quantity') and req.quantity:
+            seed["quantity"] = req.quantity
+        if hasattr(req, 'experience') and req.experience:
+            seed["experience_level"] = "given"
+        if seed:
+            update_profile(session_id, seed)
+        profile = get_profile(session_id)
+
         try:
             result = await analyze_product(
                 req.description,
                 rag_context=rag_context,
-                cross_session_context=cross_ctx
+                cross_session_context=cross_ctx,
+                known_profile=profile
             )
         except Exception as e:
             logger.error(f"analyze_product failed: {e}\n{traceback.format_exc()}")

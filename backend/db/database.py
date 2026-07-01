@@ -5,6 +5,19 @@ from datetime import datetime
 
 DB_PATH = Path(__file__).parent.parent / "price_buddy.db"
 
+# The fields the LLM is allowed to ask follow-up questions about.
+# Order matters: this is the priority order questions are asked in.
+# marketplace_platform is intentionally last.
+# "quality" merges what used to be two separate fields (work_quality +
+# uniqueness) into a single question — they're asked together now.
+REQUIRED_PROFILE_FIELDS = [
+    "experience_level",
+    "labor_hours",
+    "packaging_quality",
+    "quality",
+    "marketplace_platform",
+]
+
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -46,6 +59,12 @@ def init_db():
             query TEXT UNIQUE NOT NULL,
             result TEXT NOT NULL,
             cached_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS session_profile (
+            session_id TEXT PRIMARY KEY,
+            profile TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL
         );
     """)
     conn.commit()
@@ -175,3 +194,60 @@ def build_cross_session_context(limit: int = 3) -> str:
             continue
 
     return "\n".join(lines)
+
+
+# ── Session profile ──────────────────────────────────────────────────────────
+# A per-session "fact sheet" of everything we already know about the product
+# being priced. This is the source of truth for "is this field already known?"
+# — used instead of trusting the LLM to remember/reason about the
+# conversation history on every turn.
+#
+# Profile keys we track:
+#   product_name, product_type, material_cost, quantity   (free-form facts)
+#   packaging_quality, work_quality, experience_level,
+#   uniqueness, marketplace_platform                      (the 5 "star" fields,
+#                                                            value = star int 1-5,
+#                                                            or the string "given"
+#                                                            if known from free text
+#                                                            without an exact star)
+
+def get_profile(session_id: str) -> dict:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT profile FROM session_profile WHERE session_id = ?", (session_id,)
+    ).fetchone()
+    conn.close()
+    if row:
+        try:
+            return json.loads(row["profile"])
+        except Exception:
+            return {}
+    return {}
+
+def update_profile(session_id: str, updates: dict) -> dict:
+    """
+    Merge non-empty values into the session's stored profile.
+    Returns the resulting full profile.
+    """
+    if not updates:
+        return get_profile(session_id)
+
+    current = get_profile(session_id)
+    for k, v in updates.items():
+        if v is None or v == "":
+            continue
+        current[k] = v
+
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO session_profile (session_id, profile, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(session_id) DO UPDATE SET profile = excluded.profile, updated_at = excluded.updated_at",
+        (session_id, json.dumps(current), datetime.utcnow().isoformat())
+    )
+    conn.commit()
+    conn.close()
+    return current
+
+def get_answered_fields(session_id: str) -> set:
+    """All field names already recorded for this session."""
+    return set(get_profile(session_id).keys())
