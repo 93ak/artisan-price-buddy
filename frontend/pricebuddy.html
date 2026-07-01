@@ -462,6 +462,7 @@ function renderFollowUpQuestions(questions) {
   if (!questions || !questions.length) return;
   // Fresh object for this question set
   window._fqAnswers = {};
+  window._fqStarLabels = {};
 
   const msgs = document.getElementById("msgs");
   const wrapper = document.createElement("div");
@@ -515,6 +516,9 @@ function renderFollowUpQuestions(questions) {
 
     } else if (q.type === "stars") {
       const labels = q.star_labels && q.star_labels.length ? q.star_labels : getStarLabels(q.field, []);
+      // Store labels in a JS map keyed by uid so onclick doesn't need to pass them inline
+      window._fqStarLabels = window._fqStarLabels || {};
+      window._fqStarLabels[uid] = labels;
       card.innerHTML = `
         <div>
           <div class="fq-question">${q.question}</div>
@@ -523,7 +527,7 @@ function renderFollowUpQuestions(questions) {
         <div>
           <div class="star-row" id="stars-${uid}">
             ${[1,2,3,4,5].map(n =>
-              `<span class="star" data-n="${n}" data-field="${uid}" onclick="setStar('${uid}',${n},${JSON.stringify(labels)})">★</span>`
+              `<span class="star" data-n="${n}" data-uid="${uid}" onclick="setStar('${uid}',${n})">★</span>`
             ).join("")}
           </div>
           <div class="star-label" id="star-label-${uid}">—</div>
@@ -554,13 +558,14 @@ function renderFollowUpQuestions(questions) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function setStar(uid, val, labels) {
+function setStar(uid, val) {
   window._fqAnswers[uid] = val;
   document.querySelectorAll(`#stars-${uid} .star`).forEach(s => {
     s.classList.toggle("lit", parseInt(s.dataset.n) <= val);
   });
+  const labels = (window._fqStarLabels || {})[uid] || [];
   const labelEl = document.getElementById(`star-label-${uid}`);
-  if (labelEl) labelEl.textContent = (labels && labels[val-1]) || `${val} star${val > 1 ? 's' : ''}`;
+  if (labelEl) labelEl.textContent = labels[val-1] || `${val} star${val > 1 ? 's' : ''}`;
 }
 
 function setChoice(uid, val, el) {

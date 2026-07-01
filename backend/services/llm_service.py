@@ -74,8 +74,9 @@ CRITICAL RULES:
 - All JSON values must be plain integers. NEVER write expressions.
 - "user_planned_price" must be null UNLESS user explicitly states a selling price.
 - chat_reply must be SHORT: max 3 sentences, no step-by-step math walkthrough (the UI shows the cost breakdown separately). Never start sentences with "We will also".
-- Only include follow_up_questions if confidence < 0.75 AND the field is GENUINELY missing.
-- Ask MAX 2 questions at a time. NEVER repeat a question already answered.
+- PREFER asking over assuming. If something would meaningfully change the price (size, medium, hours, quality, style), ASK — don't guess. A wrong assumption hurts the seller. Set confidence low (<0.7) whenever you assumed a major cost factor.
+- Include follow_up_questions whenever confidence < 0.85 OR a field that would materially affect price is missing.
+- Ask up to 3 questions per turn. NEVER repeat a question already answered.
 - If a field appears anywhere in the conversation (including star answers), do NOT ask about it again.
 - Painting-specific: framing is NOT packaging. Framing goes into materials cost if user mentions the cost.
 - The user prompt may arrive as a FACTS list (one fact per line) — read EVERY line before deciding what's missing or what value to use.
@@ -204,7 +205,7 @@ def reconcile_follow_up_questions(llm_questions: list, known_profile: dict) -> l
         q for q in llm_questions
         if isinstance(q, dict) and q.get("field") and q["field"] not in answered
     ]
-    return kept[:2]
+    return kept[:3]
 
 
 def build_reasoning_reply(parsed: dict) -> str:
