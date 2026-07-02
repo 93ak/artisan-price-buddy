@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Buddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --surface:#FBF7F5;
+    --card:#FFFFFF;
+    --ink:#221512;
+    --muted:#8A7B76;
+    --line:#ECE1DD;
+    --red:#8C1620;
+    --red-deep:#5C0F17;
+    --red-tint:#FBEBEA;
+    --good:#2E6B4E;
+    --good-tint:#EAF4EE;
+    --warn:#A9631A;
+    --warn-tint:#FCF1E2;
+    --shadow: 0 18px 40px -22px rgba(92,15,23,0.28);
+    --radius: 20px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .db-root{
+    max-width:640px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+
+  /* ---------- Header ---------- */
+  .db-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:26px;
+  }
+  .db-brand-eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--red);
+    margin:0 0 6px;
+  }
+  .db-title{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:30px;
+    line-height:1.05;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .db-title em{
+    font-style:italic;
+    color:var(--red);
+  }
+  .db-subtitle{
+    font-size:14px;
+    color:var(--muted);
+    margin:8px 0 0;
+    max-width:36ch;
+    line-height:1.45;
+  }
+  .db-mark{
+    width:44px;height:44px;
+    border-radius:50%;
+    border:1.5px solid var(--red);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    color:var(--red);
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:18px;
+    background:var(--red-tint);
+  }
+
+  /* ---------- Upload zone ---------- */
+  .db-dropzone{
+    border:1.5px dashed #DDBFBE;
+    border-radius:var(--radius);
+    background:var(--surface);
+    padding:26px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .2s ease, background .2s ease;
+    position:relative;
+  }
+  .db-dropzone.is-drag{
+    border-color:var(--red);
+    background:var(--red-tint);
+  }
+  .db-dropzone input[type=file]{
+    position:absolute; inset:0; opacity:0; cursor:pointer;
+  }
+  .db-drop-icon{
+    width:38px;height:38px;
+    margin:0 auto 10px;
+    border-radius:50%;
+    background:#fff;
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--red);
+  }
+  .db-drop-title{
+    font-weight:600;
+    font-size:14.5px;
+    margin:0 0 4px;
+  }
+  .db-drop-sub{
+    font-size:12.5px;
+    color:var(--muted);
+    margin:0;
+  }
+
+  .db-preview{
+    display:none;
+    align-items:center;
+    gap:14px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:12px;
+  }
+  .db-preview.is-active{display:flex;}
+  .db-preview img{
+    width:64px;height:64px;
+    object-fit:cover;
+    border-radius:12px;
+    border:1px solid var(--line);
+  }
+  .db-preview-name{
+    font-size:13.5px;
+    font-weight:600;
+    margin:0 0 2px;
+    word-break:break-all;
+  }
+  .db-preview-swap{
+    font-size:12px;
+    color:var(--red);
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    font-weight:600;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+
+  .db-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+  .db-btn{
+    flex:1;
+    border:none;
+    border-radius:999px;
+    padding:13px 18px;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    transition:transform .15s ease, opacity .15s ease, background .15s ease;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .db-btn:active{transform:scale(0.98);}
+  .db-btn:disabled{opacity:.5; cursor:not-allowed; transform:none;}
+  .db-btn-primary{
+    background:var(--red);
+    color:#fff;
+  }
+  .db-btn-primary:hover:not(:disabled){background:var(--red-deep);}
+  .db-btn-ghost{
+    background:#fff;
+    color:var(--ink);
+    border:1px solid var(--line);
+    flex:0 0 auto;
+    padding:13px 16px;
+  }
+
+  .db-spinner{
+    width:15px;height:15px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;
+    animation:db-spin .7s linear infinite;
+  }
+  @keyframes db-spin{to{transform:rotate(360deg);}}
+
+  .db-error{
+    display:none;
+    margin-top:14px;
+    background:#FDEEEC;
+    border:1px solid #F2C7C3;
+    color:var(--red-deep);
+    font-size:13px;
+    padding:12px 14px;
+    border-radius:12px;
+  }
+  .db-error.is-active{display:block;}
+
+  /* ---------- Results ---------- */
+  .db-results{
+    display:none;
+    margin-top:34px;
+  }
+  .db-results.is-active{display:block;}
+
+  .db-results-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    gap:12px;
+  }
+  .db-results-title{
+    font-family:'Fraunces', serif;
+    font-size:19px;
+    font-weight:600;
+    margin:0;
+  }
+  .db-verdict{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.05em;
+    padding:6px 10px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .db-verdict.good{background:var(--good-tint); color:var(--good);}
+  .db-verdict.warn{background:var(--warn-tint); color:var(--warn);}
+
+  /* swipe deck */
+  .db-deck-wrap{position:relative;}
+  .db-deck{
+    display:flex;
+    gap:14px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding:4px 4px 10px;
+    margin:0 -4px;
+    scrollbar-width:none;
+  }
+  .db-deck::-webkit-scrollbar{display:none;}
+
+  .db-card{
+    scroll-snap-align:center;
+    flex:0 0 calc(100% - 8px);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:24px;
+    box-shadow:var(--shadow);
+    padding:22px 22px 24px;
+    min-height:280px;
+    position:relative;
+    overflow:hidden;
+  }
+  .db-card::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:5px;
+    background:var(--red);
+  }
+  .db-card-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:16px;
+  }
+  .db-card-eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--red);
+    margin:0;
+  }
+  .db-card-index{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--muted);
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px 9px;
+    flex-shrink:0;
+  }
+
+  .db-card-heading{
+    font-family:'Fraunces', serif;
+    font-size:23px;
+    font-weight:600;
+    line-height:1.15;
+    margin:0 0 14px;
+  }
+
+  .db-chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:2px;
+  }
+  .db-chip{
+    font-size:12.5px;
+    font-weight:500;
+    padding:7px 12px;
+    border-radius:999px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--ink);
+  }
+
+  .db-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:9px;
+  }
+  .db-list li{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    font-size:13.5px;
+    line-height:1.45;
+  }
+  .db-mark-good, .db-mark-warn{
+    flex-shrink:0;
+    width:19px;height:19px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;
+    margin-top:1px;
+  }
+  .db-mark-good{background:var(--good-tint); color:var(--good);}
+  .db-mark-warn{background:var(--warn-tint); color:var(--warn);}
+  .db-list .is-warn{color:var(--red-deep);}
+
+  .db-section-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:16px 0 8px;
+  }
+  .db-section-label:first-of-type{margin-top:0;}
+
+  /* nav dots + arrows */
+  .db-deck-nav{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin-top:6px;
+  }
+  .db-nav-btn{
+    width:32px;height:32px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--red);
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    transition:background .15s ease;
+  }
+  .db-nav-btn:hover{background:var(--red-tint);}
+  .db-nav-btn:disabled{opacity:.3; cursor:default; background:#fff;}
+  .db-dots{display:flex; gap:6px;}
+  .db-dot{
+    width:6px;height:6px;
+    border-radius:50%;
+    background:var(--line);
+    transition:all .2s ease;
+  }
+  .db-dot.is-active{
+    background:var(--red);
+    width:18px;
+    border-radius:4px;
+  }
+
+  .db-swatch-note{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:10px;
+  }
+
+  @media (min-width:560px){
+    .db-title{font-size:34px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="db-root">
+
+  <div class="db-header">
+    <div>
+      <p class="db-brand-eyebrow">Artisan Buddy:</p>
+      <h1 class="db-title">Design Buddy</h1>
+      <p class="db-subtitle">Upload a product photo. Get suggestions on category, audience, finish and framing.</p>
+    </div>
+  </div>
+
+  <div class="db-dropzone" id="dbDropzone">
+    <input type="file" id="dbFileInput" accept="image/*">
+    <div class="db-drop-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <p class="db-drop-title">Drop a product photo, or tap to browse</p>
+    <p class="db-drop-sub">JPG or PNG, one item at a time</p>
+  </div>
+
+  <div class="db-preview" id="dbPreview">
+    <img id="dbPreviewImg" src="" alt="">
+    <div>
+      <p class="db-preview-name" id="dbPreviewName">photo.jpg</p>
+      <button class="db-preview-swap" id="dbSwapBtn" type="button">Choose a different photo</button>
+    </div>
+  </div>
+
+  <div class="db-actions">
+    <button class="db-btn db-btn-primary" id="dbAnalyzeBtn" disabled>
+      <span id="dbAnalyzeLabel">Inspect this piece</span>
+    </button>
+  </div>
+
+  <div class="db-error" id="dbError"></div>
+
+  <div class="db-results" id="dbResults">
+    <div class="db-results-head">
+      <h2 class="db-results-title">The read</h2>
+      <span class="db-verdict" id="dbVerdict">—</span>
+    </div>
+
+    <div class="db-deck-wrap">
+      <div class="db-deck" id="dbDeck"></div>
+    </div>
+
+    <div class="db-deck-nav">
+      <button class="db-nav-btn" id="dbPrevBtn" aria-label="Previous">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="db-dots" id="dbDots"></div>
+      <button class="db-nav-btn" id="dbNextBtn" aria-label="Next">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <p class="db-swatch-note">Swipe, or use the arrows, to move between sections</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // Point this at your FastAPI backend. Same-origin deploys can set this to "".
+  const API_BASE = "http://localhost:8080";
+  const ANALYZE_ENDPOINT = API_BASE + "/design-analyze"; // if you add prefix="/design"
+
+
+  const dropzone   = document.getElementById('dbDropzone');
+  const fileInput  = document.getElementById('dbFileInput');
+  const preview    = document.getElementById('dbPreview');
+  const previewImg = document.getElementById('dbPreviewImg');
+  const previewName= document.getElementById('dbPreviewName');
+  const swapBtn    = document.getElementById('dbSwapBtn');
+  const analyzeBtn = document.getElementById('dbAnalyzeBtn');
+  const analyzeLabel = document.getElementById('dbAnalyzeLabel');
+  const errorBox   = document.getElementById('dbError');
+  const results    = document.getElementById('dbResults');
+  const deck       = document.getElementById('dbDeck');
+  const dotsWrap   = document.getElementById('dbDots');
+  const prevBtn    = document.getElementById('dbPrevBtn');
+  const nextBtn    = document.getElementById('dbNextBtn');
+  const verdictEl  = document.getElementById('dbVerdict');
+
+  let selectedFile = null;
+
+  function setError(msg){
+    if(!msg){ errorBox.classList.remove('is-active'); errorBox.textContent=''; return; }
+    errorBox.textContent = msg;
+    errorBox.classList.add('is-active');
+  }
+
+  function handleFile(file){
+    if(!file || !file.type.startsWith('image/')) return;
+    selectedFile = file;
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewName.textContent = file.name;
+      preview.classList.add('is-active');
+      dropzone.style.display = 'none';
+      analyzeBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('is-drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('is-drag');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+  swapBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    preview.classList.remove('is-active');
+    dropzone.style.display = 'block';
+    analyzeBtn.disabled = true;
+    results.classList.remove('is-active');
+    setError(null);
+  });
+
+  // ---------- Card templates ----------
+  function iconGood(){ return '<span class="db-mark-good">✓</span>'; }
+  function iconWarn(){ return '<span class="db-mark-warn">!</span>'; }
+
+  function chipRow(items){
+    if(!items || !items.length) return '';
+    return '<div class="db-chip-row">' + items.map(i => `<span class="db-chip">${escapeHtml(i)}</span>`).join('') + '</div>';
+  }
+
+  function checklist(good, warn){
+    let html = '<ul class="db-list">';
+    (good||[]).forEach(g => { html += `<li>${iconGood()}<span>${escapeHtml(g)}</span></li>`; });
+    (warn||[]).forEach(w => { html += `<li>${iconWarn()}<span class="is-warn">${escapeHtml(w)}</span></li>`; });
+    html += '</ul>';
+    return html;
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+  }
+
+  function buildCards(data){
+    const cards = [];
+    
+    cards.push({
+      eyebrow: 'Target Audience',
+      heading: 'Who this speaks to',
+      body: chipRow(data.audience)
+    });
+
+    cards.push({
+      eyebrow: 'Craftsmanship',
+      heading: (data.craftsmanship && data.craftsmanship.issues && data.craftsmanship.issues.length) ? 'Solid work, a few fixes' : 'Clean execution',
+      body: checklist(data.craftsmanship && data.craftsmanship.good, data.craftsmanship && data.craftsmanship.issues)
+    });
+
+    cards.push({
+      eyebrow: 'Photography',
+      heading: (data.photography && data.photography.issues && data.photography.issues.length) ? 'Shot needs a retake' : 'Photo-ready',
+      body: checklist(data.photography && data.photography.good, data.photography && data.photography.issues)
+    });
+
+    cards.push({
+      eyebrow: 'Selling Points',
+      heading: 'Lead with this in your listing',
+      body: chipRow(data.sellingPoints)
+    });
+
+    return cards;
+  }
+
+  function renderCards(cards){
+    deck.innerHTML = '';
+    dotsWrap.innerHTML = '';
+    cards.forEach((c, i) => {
+      const card = document.createElement('div');
+      card.className = 'db-card';
+      card.innerHTML = `
+        <div class="db-card-top">
+          <p class="db-card-eyebrow">${escapeHtml(c.eyebrow)}</p>
+          <span class="db-card-index">${i+1} / ${cards.length}</span>
+        </div>
+        <h3 class="db-card-heading">${escapeHtml(c.heading)}</h3>
+        ${c.body || '<p style="color:var(--muted); font-size:13px;">Nothing notable here.</p>'}
+      `;
+      deck.appendChild(card);
+
+      const dot = document.createElement('div');
+      dot.className = 'db-dot' + (i===0 ? ' is-active' : '');
+      dotsWrap.appendChild(dot);
+    });
+    updateNavState();
+  }
+
+  function currentIndex(){
+    const cardWidth = deck.firstElementChild ? deck.firstElementChild.getBoundingClientRect().width + 14 : 1;
+    return Math.round(deck.scrollLeft / cardWidth);
+  }
+
+  function scrollToIndex(i){
+    const cards = deck.children;
+    if(!cards.length) return;
+    i = Math.max(0, Math.min(cards.length - 1, i));
+    const cardWidth = cards[0].getBoundingClientRect().width + 14;
+    deck.scrollTo({ left: i * cardWidth, behavior: 'smooth' });
+  }
+
+  function updateNavState(){
+    const idx = currentIndex();
+    const dots = dotsWrap.children;
+    for(let i=0;i<dots.length;i++){
+      dots[i].classList.toggle('is-active', i === idx);
+    }
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx >= dots.length - 1;
+  }
+
+  deck.addEventListener('scroll', () => { window.requestAnimationFrame(updateNavState); });
+  prevBtn.addEventListener('click', () => scrollToIndex(currentIndex() - 1));
+  nextBtn.addEventListener('click', () => scrollToIndex(currentIndex() + 1));
+
+  function setVerdict(data){
+    const issues = (data.craftsmanship && data.craftsmanship.issues ? data.craftsmanship.issues.length : 0)
+                 + (data.photography && data.photography.issues ? data.photography.issues.length : 0);
+    if(issues === 0){
+      verdictEl.textContent = 'Ready to list';
+      verdictEl.className = 'db-verdict good';
+    } else {
+      verdictEl.textContent = issues + (issues === 1 ? ' fix suggested' : ' fixes suggested');
+      verdictEl.className = 'db-verdict warn';
+    }
+  }
+
+  async function analyze(){
+    if(!selectedFile) return;
+    setError(null);
+    analyzeBtn.disabled = true;
+    analyzeLabel.innerHTML = '<span class="db-spinner"></span> Inspecting…';
+
+    try{
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+
+      const res = await fetch(ANALYZE_ENDPOINT, { method: 'POST', body: formData });
+      if(!res.ok){
+        throw new Error('Server responded with ' + res.status);
+      }
+      const data = await res.json();
+
+      setVerdict(data);
+      renderCards(buildCards(data));
+      results.classList.add('is-active');
+      results.scrollIntoView({ behavior:'smooth', block:'start' });
+
+    } catch(err){
+      setError("Couldn't inspect this photo. Check that the backend is running, then try again.");
+      console.error(err);
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeLabel.textContent = 'Inspect this piece';
+    }
+  }
+
+  analyzeBtn.addEventListener('click', analyze);
+})();
+</script>
+
+</body>
+</html>

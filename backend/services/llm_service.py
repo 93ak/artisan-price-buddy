@@ -68,19 +68,31 @@ Craft time DEFAULTS (use ONLY if user did not state hours): crochet teddy=5hr, c
 CRITICAL RULES:
 - If user states hours explicitly, USE THAT EXACT NUMBER.
 - If user states material cost, USE IT AS-IS. Never multiply by quantity.
-- The prompt lists FACTS as "field: value" pairs. Every fact explicitly given is FINAL — never substitute a default or an earlier guess for it, even if an earlier part of the text seems to suggest otherwise. The LAST stated value for any field always wins.
+- The prompt contains a LOCKED VALUES block — treat every value there as immutable. Never re-derive, re-estimate, or change them. They represent confirmed facts from prior turns.
+- The prompt also contains USER FACTS lines. Later lines override earlier ones on the same field.
 - marketplace_fee = round((materials + labor + packaging + transport) * 0.08)
 - waste_allowance = round(materials * 0.10)
 - All JSON values must be plain integers. NEVER write expressions.
 - "user_planned_price" must be null UNLESS user explicitly states a selling price.
-- chat_reply must be SHORT: max 3 sentences, no step-by-step math walkthrough (the UI shows the cost breakdown separately). Never start sentences with "We will also".
-- PREFER asking over assuming. If something would meaningfully change the price (size, medium, hours, quality, style), ASK — don't guess. A wrong assumption hurts the seller. Set confidence low (<0.7) whenever you assumed a major cost factor.
+- chat_reply must be SHORT: max 3 sentences, no step-by-step math walkthrough. Never start sentences with "We will also".
+- PREFER asking over assuming. If something would meaningfully change the price, ASK — don't guess. Set confidence low (<0.7) whenever you assumed a major cost factor.
 - Include follow_up_questions whenever confidence < 0.85 OR a field that would materially affect price is missing.
 - Ask up to 3 questions per turn. NEVER repeat a question already answered.
-- If a field appears anywhere in the conversation (including star answers), do NOT ask about it again.
-- Painting-specific: framing is NOT packaging. Framing goes into materials cost if user mentions the cost.
-- The user prompt may arrive as a FACTS list (one fact per line) — read EVERY line before deciding what's missing or what value to use.
-- marketplace_platform is always the LAST question to ask — only after the core pricing fields are known.
+
+QUESTION HIERARCHY — strictly follow this order. Never ask a Tier N question if any Tier <N question is still unanswered:
+  Tier 1 — Core inputs (ask these FIRST, nothing else matters without them):
+    * labor_hours: how long does one unit take to make?
+    * material_cost: if not already given
+  Tier 2 — Product context (ask after Tier 1 is known):
+    * Size, dimensions, weight — anything that directly affects labor time
+    * Medium, material type, technique (e.g. art style, yarn type, wax type)
+    * Product-specific details (e.g. number of colours for block print, kiln-fired for pottery)
+  Tier 3 — Quality signals (ask after Tier 2):
+    * work_quality, experience_level, uniqueness
+  Tier 4 — Fulfillment (ask after Tier 3):
+    * packaging_quality
+  Tier 5 — Sales channel (ask LAST, only once all other tiers are done):
+    * marketplace_platform
 
 Packaging cost by star: 1=5, 2=10, 3=25, 4=60, 5=120.
 
@@ -251,15 +263,39 @@ def build_reasoning_reply(parsed: dict) -> str:
 
 def infer_profile_updates_from_result(result: dict) -> dict:
     """
-    After an analysis, pull out anything the LLM effectively confirmed as
-    "known" so the profile stays accurate even when info arrived as free
-    text rather than a structured star answer.
+    After an analysis, pull out values the LLM used (assumed or stated) so
+    they get locked into the session profile and never drift between turns.
+    This is especially important for labor_hours — if the model assumed 5hrs
+    on turn 1, that assumption must survive into turns 2, 3, etc. unchanged
+    unless the user explicitly corrects it.
     """
     updates = {}
     if result.get("product_type"):
         updates["product_type"] = result["product_type"]
 
     costs = result.get("costs", {})
+
+    # Lock labor hours derived from the result (labor ÷ rate).
+    # We store it as a string like "5" so it shows up in LOCKED FACTS as plain text.
+    labor = costs.get("labor")
+    reasoning = result.get("labor_reasoning", "")
+    if labor and reasoning:
+        # Parse "X hrs x ₹Y/hr" from labor_reasoning
+        m = re.match(r"([\d.]+)\s*hrs?", reasoning, re.IGNORECASE)
+        if m:
+            updates["labor_hours"] = m.group(1)
+    elif labor:
+        # Fallback: approximate from labor cost (use default 150/hr rate)
+        approx_hrs = round(labor / 150, 1)
+        if approx_hrs > 0:
+            updates["labor_hours"] = str(approx_hrs)
+
+    # Lock material cost
+    mat = costs.get("materials")
+    if mat:
+        updates["material_cost"] = str(mat)
+
+    # Lock packaging if stated
     if str(costs.get("packaging_note", "")).strip().lower() == "stated":
         updates["packaging_quality"] = "given"
 
