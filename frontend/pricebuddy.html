@@ -142,6 +142,31 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; h
 }
 .choice-opt.selected .choice-num { background: #7a1212; color: #fff; }
 
+/* Photo upload (optional, start form) */
+.photo-upload-wrap { margin-top: 0.5rem; }
+.photo-label { display: block; font-size: 13px; font-weight: 600; color: #7a1212; margin-bottom: 6px; }
+.photo-label span { font-weight: 400; color: #aaa; font-size: 11px; margin-left: 6px; }
+.photo-drop {
+  border: 1.5px dashed #e8d8d8; border-radius: 10px; background: #fafafa;
+  padding: 14px; text-align: center; cursor: pointer; transition: all .15s; position: relative;
+}
+.photo-drop:hover, .photo-drop.drag { border-color: #7a1212; background: #fbeeee; }
+.photo-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.photo-drop-text { font-size: 12.5px; color: #999; pointer-events: none; }
+.photo-preview-row {
+  display: none; align-items: center; gap: 10px;
+  background: #fdf5f5; border: 1px solid #e8d8d8; border-radius: 10px; padding: 8px 10px;
+}
+.photo-preview-row.active { display: flex; }
+.photo-preview-row img { width: 48px; height: 48px; object-fit: cover; border-radius: 7px; }
+.photo-preview-info { flex: 1; min-width: 0; }
+.photo-preview-name { font-size: 12px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.photo-preview-status { font-size: 11px; color: #999; margin-top: 2px; }
+.photo-preview-status.ok { color: #2e6b4e; }
+.photo-preview-status.err { color: #7a1212; }
+.photo-remove { background: none; border: none; color: #aaa; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+.photo-remove:hover { color: #7a1212; }
+
 /* Submit button inside question card */
 .fq-submit {
   align-self: flex-start;
@@ -257,8 +282,24 @@ textarea:focus { border-color: #7a1212; background: #fff; }
           <div class="start-sub">Fill in the basics and I'll work out a fair price for you.</div>
           <div class="field"><label>Product name</label><input id="f-name" placeholder="e.g. Hand-painted clay diya"/></div>
           <div class="field"><label>Material cost (₹)</label><input id="f-cost" type="number" min="0" placeholder="e.g. 120"/></div>
-          <div class="field"><label>Your experience</label><input id="f-exp" placeholder="e.g. 2 years making clay items"/></div>
+          <div class="field"><label>Hours taken to make</label><input id="f-exp" type="number" min="0" step="0.5" placeholder="e.g. 3"/></div>
           <div class="field"><label>Number of products in a set</label><input id="f-qty" type="number" min="1" placeholder="e.g. 10"/></div>
+
+          <div class="photo-upload-wrap">
+            <label class="photo-label">Product photo <span>optional — we'll read quality from it</span></label>
+            <div class="photo-drop" id="photo-drop">
+              <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp"/>
+              <div class="photo-drop-text">📷 Tap to upload a photo</div>
+            </div>
+            <div class="photo-preview-row" id="photo-preview-row">
+              <img id="photo-preview-img" src="" alt=""/>
+              <div class="photo-preview-info">
+                <div class="photo-preview-name" id="photo-preview-name"></div>
+                <div class="photo-preview-status" id="photo-preview-status">Ready</div>
+              </div>
+              <button class="photo-remove" onclick="removePhoto()" title="Remove">✕</button>
+            </div>
+          </div>
           <button class="start-btn" id="start-btn" onclick="startAnalysis()">Get my price ↑</button>
         </div>
       </div>
@@ -370,10 +411,42 @@ async function startAnalysis() {
   const qty = document.getElementById("f-qty").value.trim();
   if (!name || !cost) { alert("Please fill in at least the product name and material cost."); return; }
 
-  const prompt = `Product: ${name}. Material cost: ₹${cost}. Experience: ${exp || "not specified"}. Number of products in set: ${qty || "1"}.`;
-
   busy = true;
   document.getElementById("start-btn").disabled = true;
+
+  // ── Optional: analyse photo for quality + product hints ──────────────
+  let imageQualityNote = "";
+  let imageProfileUpdates = {};
+  const photoFile = window._photoFile;
+  if (photoFile) {
+    const statusEl = document.getElementById("photo-preview-status");
+    statusEl.textContent = "Analysing photo…";
+    statusEl.className = "photo-preview-status";
+    try {
+      const fd = new FormData();
+      fd.append("image", photoFile);
+      const r = await fetch(API + "/price-image-analyze", { method: "POST", body: fd });
+      if (r.ok) {
+        const img = await r.json();
+        const stars = img.work_quality_stars || 3;
+        const reason = img.work_quality_reason || "";
+        const details = [...(img.product_details || []), ...(img.material_hints || [])].join(", ");
+        imageQualityNote = `Work quality from photo: ${stars} stars (${reason}).${details ? " Visible details: " + details + "." : ""}`;
+        imageProfileUpdates = { work_quality: stars };
+        statusEl.textContent = `Quality read: ${stars}★ — ${reason}`;
+        statusEl.className = "photo-preview-status ok";
+      } else {
+        statusEl.textContent = "Couldn't read photo — continuing without it";
+        statusEl.className = "photo-preview-status err";
+      }
+    } catch (e) {
+      document.getElementById("photo-preview-status").textContent = "Photo analysis failed — continuing";
+      document.getElementById("photo-preview-status").className = "photo-preview-status err";
+    }
+  }
+
+  const prompt = `Product: ${name}. Material cost: ₹${cost}. Hours to make: ${exp || "not specified"}. Number of products in set: ${qty || "1"}.${imageQualityNote ? " " + imageQualityNote : ""}`;
+
   document.getElementById("start-wrap").classList.add("hidden");
   document.getElementById("msgs").classList.remove("hidden");
   document.getElementById("input-area").classList.remove("hidden");
@@ -390,7 +463,8 @@ async function startAnalysis() {
         product_name: name,
         material_cost: cost,
         experience: exp,
-        quantity: qty
+        quantity: qty,
+        image_quality_stars: imageProfileUpdates.work_quality || null
       })
     });
     removeTyping();
@@ -426,6 +500,45 @@ function autosize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 120) + "px";
 }
+
+// ── Photo upload helpers ────────────────────────────────────────────────────
+window._photoFile = null;
+
+function removePhoto() {
+  window._photoFile = null;
+  document.getElementById("photo-input").value = "";
+  document.getElementById("photo-preview-row").classList.remove("active");
+  document.getElementById("photo-drop").style.display = "";
+}
+
+(function initPhotoUpload() {
+  const input = document.getElementById("photo-input");
+  const drop  = document.getElementById("photo-drop");
+  if (!input || !drop) return;
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    window._photoFile = file;
+    document.getElementById("photo-preview-name").textContent = file.name;
+    document.getElementById("photo-preview-status").textContent = "Ready to analyse";
+    document.getElementById("photo-preview-status").className = "photo-preview-status";
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById("photo-preview-img").src = e.target.result;
+      document.getElementById("photo-preview-row").classList.add("active");
+      drop.style.display = "none";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  input.addEventListener("change", e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", e => {
+    e.preventDefault(); drop.classList.remove("drag");
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+})();
 
 function handleKey(e) {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }

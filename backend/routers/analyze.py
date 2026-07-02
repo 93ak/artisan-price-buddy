@@ -4,10 +4,13 @@ from typing import Optional
 import uuid
 import traceback
 import logging
-from services.llm_service import analyze_product, check_llm_health
+from services.llm_service import analyze_product, check_llm_health, infer_profile_updates_from_result
 from services.scraper import research_market
 from rag.rag_service import retrieve_similar, format_for_prompt
-from db.database import save_message, save_analysis, update_session_meta, build_cross_session_context, get_profile, update_profile
+from db.database import (
+    save_message, save_analysis, update_session_meta, build_cross_session_context,
+    get_profile, update_profile
+)
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -15,6 +18,14 @@ router = APIRouter()
 class AnalyzeRequest(BaseModel):
     description: str
     session_id: Optional[str] = None
+    # Structured facts from the initial form (frontend/pricebuddy.html).
+    # These get written straight into the session profile so the LLM never
+    # has to be trusted to "remember" them from the prose description.
+    product_name: Optional[str] = None
+    material_cost: Optional[str] = None
+    experience: Optional[str] = None
+    quantity: Optional[str] = None
+    image_quality_stars: Optional[int] = None  # work_quality from photo analysis
 
 class AnalyzeResponse(BaseModel):
     session_id: str
@@ -41,6 +52,23 @@ async def analyze(req: AnalyzeRequest):
         session_id = req.session_id or str(uuid.uuid4())
         save_message(session_id, "user", req.description)
 
+        # ── Step 0: seed the session profile from structured form fields ───
+        # experience_level is marked "given" (rather than a star number) since
+        # the form collects free text, not a 1-5 rating — this just stops the
+        # follow-up logic from re-asking about experience.
+        seed_updates = {}
+        if req.product_name:
+            seed_updates["product_name"] = req.product_name
+        if req.material_cost:
+            seed_updates["material_cost"] = req.material_cost
+        if req.quantity:
+            seed_updates["quantity"] = req.quantity
+        if req.experience:
+            seed_updates["labor_hours"] = req.experience
+        if req.image_quality_stars:
+            seed_updates["work_quality"] = req.image_quality_stars
+        profile = update_profile(session_id, seed_updates)
+
         # ── Step 1: RAG retrieval ──────────────────────────────────────────
         retrieved = []
         rag_context = ""
@@ -59,20 +87,6 @@ async def analyze(req: AnalyzeRequest):
             logger.warning(f"Cross-session context failed (non-fatal): {e}")
 
         # ── Step 3: LLM analysis ──────────────────────────────────────────
-        # Seed profile from structured form fields
-        seed = {}
-        if hasattr(req, 'product_name') and req.product_name:
-            seed["product_name"] = req.product_name
-        if hasattr(req, 'material_cost') and req.material_cost:
-            seed["material_cost"] = req.material_cost
-        if hasattr(req, 'quantity') and req.quantity:
-            seed["quantity"] = req.quantity
-        if hasattr(req, 'experience') and req.experience:
-            seed["experience_level"] = "given"
-        if seed:
-            update_profile(session_id, seed)
-        profile = get_profile(session_id)
-
         try:
             result = await analyze_product(
                 req.description,
@@ -108,6 +122,8 @@ async def analyze(req: AnalyzeRequest):
             save_analysis(session_id, result)
             update_session_meta(session_id, result.get("product_type", ""), result.get("chat_reply", "")[:120])
             save_message(session_id, "assistant", result.get("chat_reply", ""))
+            # Sync profile with anything the LLM confirmed (product_type, etc.)
+            update_profile(session_id, infer_profile_updates_from_result(result))
         except Exception as e:
             logger.warning(f"DB save failed (non-fatal): {e}")
 

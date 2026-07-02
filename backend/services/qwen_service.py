@@ -73,6 +73,34 @@ Rules:
 - Keep every string under 12 words.
 - Base everything only on what is visible in the photo.
 """
+# ── Pricing-specific image analysis ──────────────────────────────────────────
+
+PRICING_VISION_PROMPT = """You are a craft quality assessor for a handmade goods pricing tool.
+Look at this product photo and assess ONLY:
+1. The craft/work quality of the item itself (not the photography)
+2. Any product details visible in the image that would help with pricing
+
+Do NOT comment on photography, lighting, background, or listing quality.
+Focus on: finish quality, skill level visible, material apparent, size/scale hints, product type.
+
+Respond with ONLY a valid JSON object — no markdown, no commentary:
+
+{
+  "work_quality_stars": 3,
+  "work_quality_reason": "One short phrase explaining the star rating",
+  "product_details": ["visible detail 1", "visible detail 2"],
+  "material_hints": ["apparent material or technique"]
+}
+
+work_quality_stars scale:
+  1 = Learning/practice quality — visible mistakes, uneven finish
+  2 = Decent — minor imperfections, still marketable
+  3 = Good, market standard — clean, consistent
+  4 = Polished, professional — very clean finish, refined details
+  5 = Expert/gallery quality — exceptional craftsmanship, no visible flaws
+
+Keep every string under 10 words. Base everything only on what is visible."""
+
 
 
 def _strip_thinking(raw: str) -> str:
@@ -120,6 +148,60 @@ def _to_data_uri(image_bytes: bytes, content_type: str) -> str:
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:{content_type};base64,{b64}"
 
+
+async def analyze_image_for_pricing(image_bytes: bytes, content_type: str = "image/jpeg") -> dict:
+    """
+    Assess craft quality and extract visible product details from a photo.
+    Returns a dict with work_quality_stars (1-5), work_quality_reason,
+    product_details (list), and material_hints (list).
+    Used by Price Buddy's initial form — quality is seeded into the session
+    profile so the LLM never needs to ask about it.
+    """
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is not set in the environment.")
+
+    image_data_uri = _to_data_uri(image_bytes, content_type)
+
+    payload = {
+        "model": MODEL_NAME,
+        "reasoning_format": "hidden",
+        "reasoning_effort": "none",
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": PRICING_VISION_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Assess the craft quality and describe what you see."},
+                    {"type": "image_url", "image_url": {"url": image_data_uri}},
+                ],
+            },
+        ],
+    }
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(GROQ_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+
+    raw_content = result["choices"][0]["message"]["content"]
+    cleaned = _strip_thinking(raw_content)
+    parsed = _extract_json(cleaned)
+
+    # Ensure defaults and clamp stars to 1-5
+    parsed.setdefault("work_quality_stars", 3)
+    parsed.setdefault("work_quality_reason", "")
+    parsed.setdefault("product_details", [])
+    parsed.setdefault("material_hints", [])
+    parsed["work_quality_stars"] = max(1, min(5, int(parsed["work_quality_stars"])))
+
+    return parsed
 
 async def analyze_product_image(image_bytes: bytes, content_type: str = "image/jpeg") -> dict:
     """
