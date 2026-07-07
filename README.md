@@ -3,6 +3,9 @@
 > AI-powered pricing and listing assistant for artisans.
 
 Price Buddy helps artisans estimate fair selling prices using AI reasoning, semantic search, and real marketplace data. It also reviews product photos and provides actionable design feedback before products are listed for sale.
+<p align="center">
+  <img src="images/homepage.png" width="46%">
+</p>
 
 ---
 
@@ -20,7 +23,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 </p>
   
 <p align="center">
-  <img src="images/resultprice.png" width="46%">
+  <img src="images/resultprice.png" width="90">
 </p>
   
 
