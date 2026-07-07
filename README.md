@@ -17,8 +17,12 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 
 <p align="center">
   <img src="images/chatprompt.png" width="46%">
+</p>
+  
+<p align="center">
   <img src="images/resultprice.png" width="46%">
 </p>
+  
 
 ---
 
