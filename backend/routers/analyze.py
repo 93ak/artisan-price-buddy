@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -7,6 +8,7 @@ import logging
 from services.llm_service import analyze_product, check_llm_health, infer_profile_updates_from_result
 from services.scraper import research_market
 from rag.rag_service import retrieve_similar, format_for_prompt
+from market_rag.retrieval import get_market_references, format_market_reference_block
 from db.database import (
     save_message, save_analysis, update_session_meta, build_cross_session_context,
     get_profile, update_profile
@@ -69,7 +71,7 @@ async def analyze(req: AnalyzeRequest):
             seed_updates["work_quality"] = req.image_quality_stars
         profile = update_profile(session_id, seed_updates)
 
-        # ── Step 1: RAG retrieval ──────────────────────────────────────────
+        # ── Step 1: RAG retrieval (existing pricing-history RAG — unchanged) ─
         retrieved = []
         rag_context = ""
         try:
@@ -78,6 +80,33 @@ async def analyze(req: AnalyzeRequest):
                 rag_context = format_for_prompt(retrieved)
         except Exception as e:
             logger.warning(f"RAG retrieval failed (non-fatal): {e}")
+
+        # ── Step 1b: Market reference retrieval (NEW, backend-only) ────────
+        # Pulls up to 5 comparable marketplace listings from market_index to
+        # ground the LLM's pricing in real market data. Never forced to a
+        # fixed count — 0, 1, or 5 results are all valid. Folded straight
+        # into rag_context so llm_service.py needs no changes at all: it
+        # already treats rag_context as one opaque block of prompt text.
+        # Never surfaced in AnalyzeResponse — purely internal to the prompt.
+        try:
+            market_refs = await asyncio.to_thread(get_market_references, req.description)
+            if market_refs:
+                logger.info(
+                    f"Market references for session {session_id} ({len(market_refs)} found): " +
+                    "; ".join(
+                        f"\"{r.get('title','')}\" ₹{r.get('price',0):.0f} "
+                        f"(score={r.get('_score',0):.2f})"
+                        for r in market_refs
+                    )
+                )
+            else:
+                logger.info(f"Market references for session {session_id}: none found above relevance threshold")
+
+            market_block = format_market_reference_block(market_refs)
+            if market_block:
+                rag_context = f"{rag_context}\n\n{market_block}" if rag_context else market_block
+        except Exception as e:
+            logger.warning(f"Market reference retrieval failed (non-fatal): {e}")
 
         # ── Step 2: Cross-session context ─────────────────────────────────
         cross_ctx = ""
