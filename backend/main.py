@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import analyze, market, chat, history, design, price_image
+from routers import analyze, market, chat, history, design, price_image, market_index
 from db.database import init_db
 import logging
 
@@ -30,6 +30,8 @@ app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(history.router, prefix="/history", tags=["history"])
 app.include_router(design.router, tags=["design"])
 app.include_router(price_image.router, tags=["price-image"])
+app.include_router(market_index.router, prefix="/market-index", tags=["market-index"])
+
 
 @app.post("/rag/index")
 async def reindex():

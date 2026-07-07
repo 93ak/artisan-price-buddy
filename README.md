@@ -35,6 +35,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 
 ---
 
+<<<<<<< HEAD
 ### Custom Marketplace RAG
 
 Instead of relying solely on an LLM's general knowledge, Price Buddy retrieves similar real-world products before generating a recommendation.
@@ -70,11 +71,13 @@ LLM Price Recommendation
 
 ---
 
+=======
+>>>>>>> db4d45b (readme images, backend market_dataset.json)
 ## Highlights
 
 - Built a custom Retrieval-Augmented Generation (RAG) pipeline from scratch.
 - Created a marketplace knowledge base using **1,400+ real marketplace products**.
-- Automatically retrieves product information directly from the Yuukke Marketplace API.
+- Automatically retrieves product information directly from the Marketplace API.
 - Enriches marketplace data with AI-generated categories, materials, and searchable keywords.
 - Uses Sentence Transformers and ChromaDB for semantic similarity search.
 - Combines retrieved marketplace examples with LLM reasoning to generate explainable, market-aware price recommendations.
@@ -168,4 +171,8 @@ API Docs → `http://localhost:8080/docs`
 - Personalized pricing based on artisan experience and region.
 - Automatic material detection from uploaded product images.
 - Market trend tracking and demand forecasting.
+<<<<<<< HEAD
 - Export pricing reports for sellers and businesses.
+=======
+- Export pricing reports for sellers and businesses.
+>>>>>>> db4d45b (readme images, backend market_dataset.json)
