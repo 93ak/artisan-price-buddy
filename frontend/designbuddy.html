@@ -472,7 +472,11 @@
 <script>
 (function(){
   // Point this at your FastAPI backend. Same-origin deploys can set this to "".
-  const API_BASE = "http://localhost:8080";
+  const API_BASE =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8080"
+    : "https://your-backend.onrender.com";
   const ANALYZE_ENDPOINT = API_BASE + "/design-analyze"; // if you add prefix="/design"
 
 

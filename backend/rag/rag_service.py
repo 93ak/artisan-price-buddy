@@ -1,24 +1,27 @@
 """
-RAG service using ChromaDB + sentence-transformers (local, CPU, no Ollama needed).
+RAG service using Postgres + pgvector (persists across Render deploys,
+unlike the old Chroma on-disk store) + sentence-transformers (local, CPU).
 Model: all-MiniLM-L6-v2 (~90MB, downloads once on first run)
 """
 import json
 import logging
-from pathlib import Path
+import os
 from typing import Optional
-import chromadb
-from chromadb.config import Settings
+
+import psycopg
+from psycopg.rows import dict_row
+from pgvector.psycopg import register_vector
 from sentence_transformers import SentenceTransformer
+
 from rag.dataset import ARTISAN_PRODUCTS
 
 logger = logging.getLogger("uvicorn.error")
 
-CHROMA_PATH = Path(__file__).parent.parent / "chroma_db"
-COLLECTION_NAME = "artisan_products_v2"
+DATABASE_URL = os.environ["DATABASE_URL"]
+TABLE_NAME = "artisan_products"
 EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBED_DIM = 384
 
-_client = None
-_collection = None
 _embedder: Optional[SentenceTransformer] = None
 
 
@@ -33,51 +36,36 @@ def get_embedder() -> SentenceTransformer:
 
 def embed(texts: list[str]) -> list[list[float]]:
     """Synchronous local embedding — fast enough to not need async."""
-    model = get_embedder()
-    return model.encode(texts, show_progress_bar=False).tolist()
+    return get_embedder().encode(texts, show_progress_bar=False).tolist()
 
 
-def get_client():
-    global _client
-    if _client is None:
-        _client = chromadb.PersistentClient(
-            path=str(CHROMA_PATH),
-            settings=Settings(anonymized_telemetry=False)
-        )
-    return _client
+def get_conn():
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    register_vector(conn)  # lets us pass python lists straight in as `vector`
+    return conn
 
 
-def get_collection():
-    global _collection
-    if _collection is None:
-        _collection = get_client().get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-            embedding_function=None  # we supply our own
-        )
-    return _collection
-
-
-def _reset_collection():
-    """
-    Drop and recreate the collection. Used when the persisted on-disk index
-    is corrupted or incompatible with the installed chromadb version
-    (symptom: cryptic errors like "object of type 'int' has no len()" from
-    collection.count()/query()). Caller is responsible for re-indexing after.
-    """
-    global _collection
-    logger.warning("RAG: collection appears corrupted/incompatible — resetting it.")
-    client = get_client()
-    try:
-        client.delete_collection(COLLECTION_NAME)
-    except Exception:
-        pass
-    _collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"},
-        embedding_function=None
-    )
-    return _collection
+def _ensure_table():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                id TEXT PRIMARY KEY,
+                document TEXT NOT NULL,
+                embedding vector({EMBED_DIM}) NOT NULL,
+                category TEXT,
+                material_cost REAL,
+                labor_hours REAL,
+                complexity TEXT,
+                experience_level TEXT,
+                selling_price REAL,
+                tags TEXT,
+                description TEXT
+            );
+        """)
+    conn.commit()
+    conn.close()
 
 
 def _product_to_text(p: dict) -> str:
@@ -91,100 +79,105 @@ def _product_to_text(p: dict) -> str:
 
 
 async def index_dataset(force: bool = False) -> dict:
-    collection = get_collection()
-    try:
-        existing = collection.count()
-    except Exception as e:
-        logger.warning(f"RAG: collection.count() failed ({e}) — resetting collection.")
-        collection = _reset_collection()
-        existing = 0
+    _ensure_table()
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+        existing = cur.fetchone()["n"]
 
     if existing >= len(ARTISAN_PRODUCTS) and not force:
+        conn.close()
         logger.info(f"RAG: Already indexed {existing} products, skipping.")
         return {"status": "skipped", "count": existing}
 
     logger.info(f"RAG: Indexing {len(ARTISAN_PRODUCTS)} products with {EMBED_MODEL_NAME}...")
     texts = [_product_to_text(p) for p in ARTISAN_PRODUCTS]
-    ids = [p["id"] for p in ARTISAN_PRODUCTS]
-    metadatas = [{
-        "category": p["category"],
-        "material_cost": p["material_cost"],
-        "labor_hours": float(p["labor_hours"]),
-        "complexity": p["complexity"],
-        "experience_level": p["experience_level"],
-        "selling_price": p["selling_price"],
-        "tags": json.dumps(p["tags"]),
-        "description": p["description"],
-    } for p in ARTISAN_PRODUCTS]
-
     embeddings = embed(texts)
 
-    if existing > 0:
-        try:
-            collection.delete(ids=ids)
-        except Exception:
-            pass
-
-    collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
+    with conn.cursor() as cur:
+        for p, text, emb in zip(ARTISAN_PRODUCTS, texts, embeddings):
+            cur.execute(
+                f"""
+                INSERT INTO {TABLE_NAME}
+                    (id, document, embedding, category, material_cost, labor_hours,
+                     complexity, experience_level, selling_price, tags, description)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    document = EXCLUDED.document,
+                    embedding = EXCLUDED.embedding,
+                    category = EXCLUDED.category,
+                    material_cost = EXCLUDED.material_cost,
+                    labor_hours = EXCLUDED.labor_hours,
+                    complexity = EXCLUDED.complexity,
+                    experience_level = EXCLUDED.experience_level,
+                    selling_price = EXCLUDED.selling_price,
+                    tags = EXCLUDED.tags,
+                    description = EXCLUDED.description
+                """,
+                (p["id"], text, emb, p["category"], p["material_cost"], float(p["labor_hours"]),
+                 p["complexity"], p["experience_level"], p["selling_price"],
+                 json.dumps(p["tags"]), p["description"])
+            )
+    conn.commit()
+    conn.close()
     logger.info(f"RAG: Indexed {len(ARTISAN_PRODUCTS)} products.")
     return {"status": "indexed", "count": len(ARTISAN_PRODUCTS), "model": EMBED_MODEL_NAME}
 
 
 async def retrieve_similar(query: str, n_results: int = 5,
                            category_filter: str = None) -> list[dict]:
-    collection = get_collection()
-    try:
-        count = collection.count()
-    except Exception as e:
-        logger.warning(f"RAG: collection.count() failed ({e}) — resetting and re-indexing.")
-        await index_dataset(force=True)
-        collection = get_collection()
-        count = collection.count()
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+        count = cur.fetchone()["n"]
+    conn.close()
 
     if count == 0:
         await index_dataset()
-        collection = get_collection()
-        count = collection.count()
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+            count = cur.fetchone()["n"]
+        conn.close()
 
     n = min(n_results, count)
     if n <= 0:
         return []
-    where = {"category": category_filter} if category_filter else None
-    query_embedding = embed([query])
 
-    try:
-        results = collection.query(
-            query_embeddings=query_embedding,
-            n_results=n,
-            where=where,
-            include=["documents", "metadatas", "distances"]
-        )
-    except Exception as e:
-        logger.warning(f"RAG: query failed ({e}) — resetting, re-indexing, retrying once.")
-        await index_dataset(force=True)
-        collection = get_collection()
-        results = collection.query(
-            query_embeddings=query_embedding,
-            n_results=n,
-            where=where,
-            include=["documents", "metadatas", "distances"]
-        )
+    q_embedding = embed([query])[0]
+
+    sql = f"""
+        SELECT id, description, category, material_cost, labor_hours, complexity,
+               experience_level, selling_price, tags,
+               embedding <=> %s AS distance
+        FROM {TABLE_NAME}
+    """
+    params = [q_embedding]
+    if category_filter:
+        sql += " WHERE category = %s"
+        params.append(category_filter)
+    sql += " ORDER BY embedding <=> %s LIMIT %s"
+    params += [q_embedding, n]
+
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    conn.close()
 
     retrieved = []
-    for i in range(len(results["ids"][0])):
-        meta = results["metadatas"][0][i]
-        similarity = round(1 - results["distances"][0][i], 3)
+    for r in rows:
         retrieved.append({
-            "id": results["ids"][0][i],
-            "description": meta["description"],
-            "category": meta["category"],
-            "material_cost": meta["material_cost"],
-            "labor_hours": meta["labor_hours"],
-            "complexity": meta["complexity"],
-            "experience_level": meta["experience_level"],
-            "selling_price": meta["selling_price"],
-            "tags": json.loads(meta["tags"]),
-            "similarity_score": similarity,
+            "id": r["id"],
+            "description": r["description"],
+            "category": r["category"],
+            "material_cost": r["material_cost"],
+            "labor_hours": r["labor_hours"],
+            "complexity": r["complexity"],
+            "experience_level": r["experience_level"],
+            "selling_price": r["selling_price"],
+            "tags": json.loads(r["tags"]),
+            "similarity_score": round(1 - r["distance"], 3),
         })
     return retrieved
 
@@ -203,11 +196,16 @@ def format_for_prompt(retrieved: list[dict]) -> str:
 
 async def get_index_status() -> dict:
     try:
-        c = get_collection()
+        _ensure_table()
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+            n = cur.fetchone()["n"]
+        conn.close()
         return {
-            "indexed": c.count(),
+            "indexed": n,
             "total": len(ARTISAN_PRODUCTS),
-            "ready": c.count() > 0,
+            "ready": n > 0,
             "embed_model": EMBED_MODEL_NAME
         }
     except Exception as e:

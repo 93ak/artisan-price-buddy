@@ -2,30 +2,28 @@
 market_index_service.py
 
 Embeds the clean market dataset with SentenceTransformer and stores it in
-its own ChromaDB collection — "market_index" — in its own persistent
-directory (data/market/chroma_market/), completely separate from wherever
-your existing pricing RAG's Chroma store lives. Nothing here touches
-rag/rag_service.py or its collection.
+Postgres (pgvector) — table "market_index" — separate from artisan_products.
+Nothing here touches rag/rag_service.py or its table.
 
 ASSUMPTION: embedding model is all-MiniLM-L6-v2 (fast, 384-dim, good default
-for short product text). Change EMBED_MODEL_NAME if you want this to match
-whatever your pricing RAG already uses.
+for short product text) — same as rag_service.py, so both tables share a
+dimension. If you ever change one, change both.
 """
 
 import json
-from pathlib import Path
+import os
 
-import chromadb
+import psycopg
+from psycopg.rows import dict_row
+from pgvector.psycopg import register_vector
 from sentence_transformers import SentenceTransformer
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "market"
-CHROMA_DIR = DATA_DIR / "chroma_market"
-COLLECTION_NAME = "market_index"
-
+DATABASE_URL = os.environ["DATABASE_URL"]
+TABLE_NAME = "market_index"
 EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBED_DIM = 384
 
 _model = None
-_client = None
 
 
 def _get_model() -> SentenceTransformer:
@@ -35,12 +33,33 @@ def _get_model() -> SentenceTransformer:
     return _model
 
 
-def _get_client() -> chromadb.ClientAPI:
-    global _client
-    if _client is None:
-        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    return _client
+def get_conn():
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    register_vector(conn)
+    return conn
+
+
+def _ensure_table():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                id TEXT PRIMARY KEY,
+                document TEXT NOT NULL,
+                embedding vector({EMBED_DIM}) NOT NULL,
+                title TEXT,
+                description TEXT,
+                price REAL,
+                seller TEXT,
+                category TEXT,
+                materials TEXT,
+                keywords TEXT,
+                source TEXT
+            );
+        """)
+    conn.commit()
+    conn.close()
 
 
 def _embedding_text(record: dict) -> str:
@@ -54,92 +73,107 @@ def _embedding_text(record: dict) -> str:
     return " | ".join(p for p in parts if p)
 
 
-def _to_metadata(record: dict) -> dict:
-    """Chroma metadata values must be str/int/float/bool — lists get flattened
-    to comma-joined strings and parsed back out in _from_metadata."""
-    return {
-        "title": record.get("title", ""),
-        "description": record.get("description", "") or "",
-        "price": float(record.get("price", 0) or 0),
-        "seller": record.get("seller", ""),
-        "category": record.get("category", ""),
-        "materials": ", ".join(record.get("materials", [])),
-        "keywords": ", ".join(record.get("keywords", [])),
-        "source": record.get("source", "Yuukke Marketplace"),
-    }
-
-
-def _from_metadata(record_id: str, metadata: dict) -> dict:
-    return {
-        "id": record_id,
-        "title": metadata.get("title", ""),
-        "description": metadata.get("description", ""),
-        "price": metadata.get("price", 0.0),
-        "seller": metadata.get("seller", ""),
-        "category": metadata.get("category", ""),
-        "materials": [m.strip() for m in metadata.get("materials", "").split(",") if m.strip()],
-        "keywords": [k.strip() for k in metadata.get("keywords", "").split(",") if k.strip()],
-        "source": metadata.get("source", "Yuukke Marketplace"),
-    }
-
-
 def build_market_index(dataset: list[dict], batch_size: int = 200) -> None:
     """Rebuilds market_index from scratch with the given dataset."""
-    client = _get_client()
+    _ensure_table()
     model = _get_model()
+    conn = get_conn()
 
-    # Drop and recreate so a rebuild never mixes stale + fresh records
-    try:
-        client.delete_collection(COLLECTION_NAME)
-    except Exception:
-        pass
-    collection = client.create_collection(name=COLLECTION_NAME)
+    # Wipe and rebuild so a rebuild never mixes stale + fresh records
+    with conn.cursor() as cur:
+        cur.execute(f"TRUNCATE TABLE {TABLE_NAME}")
+    conn.commit()
 
     for i in range(0, len(dataset), batch_size):
         batch = dataset[i:i + batch_size]
         texts = [_embedding_text(r) for r in batch]
         embeddings = model.encode(texts, convert_to_numpy=True).tolist()
 
-        collection.add(
-            ids=[r["id"] for r in batch],
-            embeddings=embeddings,
-            documents=texts,
-            metadatas=[_to_metadata(r) for r in batch],
-        )
+        with conn.cursor() as cur:
+            for r, text, emb in zip(batch, texts, embeddings):
+                cur.execute(
+                    f"""
+                    INSERT INTO {TABLE_NAME}
+                        (id, document, embedding, title, description, price, seller,
+                         category, materials, keywords, source)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        document = EXCLUDED.document,
+                        embedding = EXCLUDED.embedding,
+                        title = EXCLUDED.title,
+                        description = EXCLUDED.description,
+                        price = EXCLUDED.price,
+                        seller = EXCLUDED.seller,
+                        category = EXCLUDED.category,
+                        materials = EXCLUDED.materials,
+                        keywords = EXCLUDED.keywords,
+                        source = EXCLUDED.source
+                    """,
+                    (
+                        r["id"], text, emb, r.get("title", ""), r.get("description", "") or "",
+                        float(r.get("price", 0) or 0), r.get("seller", ""), r.get("category", ""),
+                        json.dumps(r.get("materials", [])), json.dumps(r.get("keywords", [])),
+                        r.get("source", "Yuukke Marketplace"),
+                    )
+                )
+        conn.commit()
         print(f"  indexed {min(i + batch_size, len(dataset))}/{len(dataset)}")
 
-    print(f"market_index built: {collection.count()} records -> {CHROMA_DIR}")
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+        count = cur.fetchone()["n"]
+    conn.close()
+    print(f"market_index built: {count} records -> Postgres ({TABLE_NAME})")
 
 
 def index_exists() -> bool:
-    client = _get_client()
     try:
-        collection = client.get_collection(COLLECTION_NAME)
-        return collection.count() > 0
+        _ensure_table()
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) AS n FROM {TABLE_NAME}")
+            count = cur.fetchone()["n"]
+        conn.close()
+        return count > 0
     except Exception:
         return False
 
 
 def search_market(query: str, top_k: int = 5) -> list[dict]:
     """Semantic search over market_index. Returns dataset records + _score (0-1, higher = closer)."""
-    client = _get_client()
     model = _get_model()
+    q_embedding = model.encode([query], convert_to_numpy=True).tolist()[0]
 
-    collection = client.get_collection(COLLECTION_NAME)
-    q_embedding = model.encode([query], convert_to_numpy=True).tolist()
-
-    result = collection.query(query_embeddings=q_embedding, n_results=top_k)
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT id, title, description, price, seller, category, materials, keywords, source,
+                   embedding <=> %s AS distance
+            FROM {TABLE_NAME}
+            ORDER BY embedding <=> %s
+            LIMIT %s
+            """,
+            (q_embedding, q_embedding, top_k)
+        )
+        rows = cur.fetchall()
+    conn.close()
 
     records = []
-    ids = result.get("ids", [[]])[0]
-    metadatas = result.get("metadatas", [[]])[0]
-    distances = result.get("distances", [[]])[0]
-
-    for record_id, metadata, distance in zip(ids, metadatas, distances):
-        record = _from_metadata(record_id, metadata)
-        # Chroma's default space is L2 on normalized embeddings for most sentence-transformer
-        # models in practice reads as "smaller distance = closer" — flip to a 0-1-ish score.
-        record["_score"] = 1 / (1 + distance)
-        records.append(record)
-
+    for r in rows:
+        records.append({
+            "id": r["id"],
+            "title": r["title"],
+            "description": r["description"],
+            "price": r["price"],
+            "seller": r["seller"],
+            "category": r["category"],
+            "materials": json.loads(r["materials"]) if r["materials"] else [],
+            "keywords": json.loads(r["keywords"]) if r["keywords"] else [],
+            "source": r["source"],
+            # cosine distance -> a 0-1-ish "closer is higher" score,
+            # same shape as the old Chroma L2 conversion so retrieval.py
+            # (MIN_RELEVANCE_SCORE = 0.35) doesn't need to change.
+            "_score": 1 / (1 + r["distance"]),
+        })
     return records

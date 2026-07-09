@@ -7,7 +7,10 @@ python-multipart==0.0.9
 groq==0.9.0
 python-dotenv==1.0.1
 
-chromadb==0.5.0
+# was: chromadb==0.5.0
+psycopg[binary]==3.1.19
+pgvector==0.2.5
+
 sentence-transformers==3.0.1
 transformers==4.41.2
 torch==2.3.1

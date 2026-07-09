@@ -330,7 +330,11 @@ textarea:focus { border-color: #7a1212; background: #fff; }
 </div>
 
 <script>
-const API = "http://localhost:8080";
+const API_BASE =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8080"
+    : "https://your-backend.onrender.com";
 let sessionId = null;
 let busy = false;
 
