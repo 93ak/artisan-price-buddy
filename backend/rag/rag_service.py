@@ -148,15 +148,15 @@ async def retrieve_similar(query: str, n_results: int = 5,
 
     sql = f"""
         SELECT id, description, category, material_cost, labor_hours, complexity,
-               experience_level, selling_price, tags,
-               embedding <=> %s AS distance
+            experience_level, selling_price, tags,
+            embedding <=> %s::vector AS distance
         FROM {TABLE_NAME}
     """
     params = [q_embedding]
     if category_filter:
         sql += " WHERE category = %s"
         params.append(category_filter)
-    sql += " ORDER BY embedding <=> %s LIMIT %s"
+    sql += " ORDER BY embedding <=> %s::vector LIMIT %s"
     params += [q_embedding, n]
 
     conn = get_conn()

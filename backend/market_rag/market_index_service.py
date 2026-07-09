@@ -149,9 +149,9 @@ def search_market(query: str, top_k: int = 5) -> list[dict]:
         cur.execute(
             f"""
             SELECT id, title, description, price, seller, category, materials, keywords, source,
-                   embedding <=> %s AS distance
+                embedding <=> %s::vector AS distance
             FROM {TABLE_NAME}
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <=> %s::vector
             LIMIT %s
             """,
             (q_embedding, q_embedding, top_k)
