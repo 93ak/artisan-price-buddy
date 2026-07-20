@@ -31,7 +31,8 @@ app.include_router(history.router, prefix="/history", tags=["history"])
 app.include_router(design.router, tags=["design"])
 app.include_router(price_image.router, tags=["price-image"])
 app.include_router(market_index.router, prefix="/market-index", tags=["market-index"])
-
+from routers import business_buddy
+app.include_router(business_buddy.router, prefix="/business-buddy", tags=["business-buddy"])
 
 @app.post("/rag/index")
 async def reindex():

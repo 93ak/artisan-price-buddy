@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Business Buddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #FAF7F0;
+    --card: #FFFFFF;
+    --ink: #2B2A28;
+    --ink-soft: #6B665F;
+    --sage: #6B7A5E;
+    --sage-soft: #E4E9DD;
+    --ochre: #C88B3D;
+    --ochre-soft: #F5E4C6;
+    --rust: #8E4B3D;
+    --rust-soft: #F1DCD5;
+    --line: #E8E2D4;
+    --radius: 14px;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 32px; border-bottom:1px solid var(--line);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:32px; height:32px; border-radius:8px;
+    background: linear-gradient(135deg, var(--sage), var(--ochre));
+  }
+  .brand-name{ font-family:'Fraunces', serif; font-weight:600; font-size:20px; }
+  .brand-tag{ font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono', monospace; }
+
+  .container{ max-width:1080px; margin:0 auto; padding:32px 24px 80px; }
+
+  .intake{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:24px;
+    display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+  }
+  .intake h1{
+    font-family:'Fraunces', serif; font-weight:600; font-size:26px; margin:0 0 4px;
+    width:100%;
+  }
+  .intake p.sub{ margin:0 0 12px; color:var(--ink-soft); width:100%; font-size:14px; }
+  .intake input[type=text]{
+    flex:1; min-width:220px; padding:12px 14px; border:1px solid var(--line);
+    border-radius:10px; font-size:15px; font-family:'Inter', sans-serif;
+  }
+  .intake input[type=text]:focus{ outline:2px solid var(--sage); outline-offset:1px; }
+  .btn{
+    padding:12px 20px; border-radius:10px; border:none; cursor:pointer;
+    font-family:'Inter', sans-serif; font-weight:600; font-size:14px;
+  }
+  .btn-primary{ background:var(--sage); color:#fff; }
+  .btn-primary:hover{ background:#5c6a4f; }
+  .btn-ghost{
+    background:transparent; border:1px solid var(--line); color:var(--ink);
+  }
+  .btn-ghost:hover{ background:var(--sage-soft); }
+  #imageInput{ display:none; }
+
+  .stitch{
+    border:none; border-top:2px dashed var(--line); margin:36px 0 24px;
+  }
+
+  /* --- states --- */
+  .state-box{
+    text-align:center; padding:60px 20px; color:var(--ink-soft);
+  }
+  .state-box .glyph{ font-size:34px; margin-bottom:10px; }
+  .state-box h3{ font-family:'Fraunces', serif; color:var(--ink); margin:0 0 6px; }
+
+  .skeleton-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr));
+    gap:16px;
+  }
+  .skeleton{
+    height:150px; border-radius:var(--radius); background:var(--card);
+    border:1px solid var(--line); position:relative; overflow:hidden;
+  }
+  .skeleton::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, #f0ece0, transparent);
+    animation:shimmer 1.3s infinite;
+  }
+  @keyframes shimmer{ from{ transform:translateX(-100%);} to{ transform:translateX(100%);} }
+
+  /* --- results --- */
+  .section-label{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink-soft); margin:0 0 10px;
+  }
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    gap:16px; margin-bottom:32px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px;
+  }
+  .card h3{ font-family:'Fraunces', serif; font-size:16px; margin:0 0 12px; font-weight:600; }
+  .pill-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .pill{
+    font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .pill.High{ background:var(--rust-soft); color:var(--rust); }
+  .pill.Medium{ background:var(--ochre-soft); color:#8a5f1f; }
+  .pill.Low{ background:var(--sage-soft); color:var(--sage); }
+  .kv{ font-size:13px; color:var(--ink-soft); margin-bottom:6px; }
+  .kv b{ color:var(--ink); }
+  ul.plain{ margin:0; padding-left:18px; font-size:14px; line-height:1.6; }
+  .tag{
+    display:inline-block; background:var(--sage-soft); color:var(--sage);
+    font-size:12px; padding:4px 9px; border-radius:8px; margin:0 6px 6px 0;
+  }
+  .learn-card{ background:var(--ochre-soft); border:1px solid var(--ochre); }
+  .learn-card h4{ margin:0 0 4px; font-size:14px; }
+  .learn-card p{ margin:0; font-size:13px; color:#5c4620; }
+  .risk-card{ border-left:4px solid var(--rust); }
+  .summary-card{ grid-column: 1 / -1; }
+  .summary-card p{ font-size:14px; line-height:1.6; margin:0; }
+
+  /* --- collapsible secondary cards --- */
+  .more-label{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink-soft); margin:28px 0 10px;
+  }
+  details.acc-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:10px; overflow:hidden;
+  }
+  details.acc-card summary{
+    list-style:none; cursor:pointer; padding:14px 18px; font-family:'Fraunces', serif;
+    font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:space-between;
+  }
+  details.acc-card summary::-webkit-details-marker{ display:none; }
+  details.acc-card summary::after{
+    content:"+"; font-family:'Inter', sans-serif; font-weight:400; color:var(--ink-soft); font-size:20px;
+  }
+  details.acc-card[open] summary::after{ content:"–"; }
+  details.acc-card .acc-body{ padding:0 18px 16px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div>
+      <div class="brand-name">Business Buddy</div>
+      <div class="brand-tag">market &amp; opportunity insights</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="intake">
+    <h1>What are you making?</h1>
+    <p class="sub">Type a product, or upload a photo — Business Buddy reads the market for you.</p>
+    <input type="text" id="productInput" placeholder="e.g. hand-thrown ceramic mug" />
+    <input type="file" id="imageInput" accept="image/*" />
+    <button class="btn btn-ghost" onclick="document.getElementById('imageInput').click()">Upload photo</button>
+    <button class="btn btn-primary" id="analyzeBtn">Analyze market</button>
+  </div>
+
+  <hr class="stitch" />
+
+  <div id="emptyState" class="state-box">
+    <div class="glyph">🧭</div>
+    <h3>No product analyzed yet</h3>
+    <p>Enter a product above to see demand, competition, customers and next steps.</p>
+  </div>
+
+  <div id="loadingState" class="skeleton-grid" style="display:none;">
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+  </div>
+
+  <div id="results" style="display:none;"></div>
+
+</div>
+
+<script>
+const API_BASE =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8080"
+    : ""; // set this to your deployed backend URL, same as pricebuddy.html's API constant
+const analyzeBtn = document.getElementById("analyzeBtn");
+const productInput = document.getElementById("productInput");
+const imageInput = document.getElementById("imageInput");
+const emptyState = document.getElementById("emptyState");
+const loadingState = document.getElementById("loadingState");
+const results = document.getElementById("results");
+
+analyzeBtn.addEventListener("click", async () => {
+  const productName = productInput.value.trim();
+  const imageFile = imageInput.files[0];
+
+  if (!productName && !imageFile) {
+    alert("Type a product name or upload a photo first.");
+    return;
+  }
+
+  emptyState.style.display = "none";
+  results.style.display = "none";
+  loadingState.style.display = "grid";
+
+  try {
+    let data;
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+      const res = await fetch(`${API_BASE}/business-buddy/analyze-image`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      data = await res.json();
+    } else {
+      const res = await fetch(`${API_BASE}/business-buddy/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_name: productName }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      data = await res.json();
+    }
+    renderResults(data);
+  } catch (err) {
+    loadingState.style.display = "none";
+    emptyState.style.display = "block";
+    emptyState.innerHTML = `
+      <div class="glyph">⚠️</div>
+      <h3>Couldn't analyze that product</h3>
+      <p>${String(err.message || err).slice(0, 200)}</p>
+    `;
+  }
+});
+
+function asArray(val){
+  if (Array.isArray(val)) return val;
+  if (val === null || val === undefined || val === "") return [];
+  if (typeof val === "object") return Object.values(val);
+  return [val]; // single string/number came back instead of an array
+}
+function pillsHtml(items){
+  return asArray(items).slice(0,2).map(i => `<span class="tag">${typeof i === "object" ? JSON.stringify(i) : i}</span>`).join("");
+}
+function listHtml(items, max=Infinity){
+  return `<ul class="plain">${asArray(items).slice(0,max).map(i=>`<li>${typeof i === "object" ? JSON.stringify(i) : i}</li>`).join("")}</ul>`;
+}
+
+function hasContent(val){
+  const arr = asArray(val);
+  return arr.length > 0 && arr.some(i => String(i).trim() !== "");
+}
+function accCard(title, bodyHtml, extraClass=""){
+  return `
+    <details class="acc-card ${extraClass}">
+      <summary>${title}</summary>
+      <div class="acc-body">${bodyHtml}</div>
+    </details>`;
+}
+function accCardIfAny(title, items, extraClass=""){
+  return hasContent(items) ? accCard(title, listHtml(items), extraClass) : "";
+}
+
+function renderResults(data){
+  loadingState.style.display = "none";
+  results.style.display = "block";
+
+  const bestSeason = asArray(data.best_selling_seasons)[0];
+
+  // The 3 cards shown right after analysis — 1-2 points each, nothing more.
+  const primaryCards = `
+    <div class="grid">
+      <div class="card">
+        <p class="section-label">Market Snapshot</p>
+        <div class="pill-row">
+          <span class="pill ${data.demand_level}">Demand: ${data.demand_level}</span>
+          <span class="pill ${data.competition_level}">Competition: ${data.competition_level}</span>
+        </div>
+        ${bestSeason ? `<div class="kv"><b>Best season:</b> ${bestSeason}</div>` : ""}
+      </div>
+
+      <div class="card">
+        <p class="section-label">Product Snapshot</p>
+        <div class="pill-row">
+          <span class="pill ${data.crafting_difficulty}">Difficulty: ${data.crafting_difficulty}</span>
+        </div>
+        <div class="kv"><b>Making time:</b> ${data.estimated_making_time || "—"}</div>
+      </div>
+
+      <div class="card">
+        <p class="section-label">Who's Buying</p>
+        ${pillsHtml(data.target_audience)}
+        <div class="kv" style="margin-top:8px;">${asArray(data.buying_motivation)[0] || ""}</div>
+      </div>
+    </div>
+  `;
+
+  // Everything else — collapsed by default, one tap to expand.
+  // Cards with no data from the model are skipped entirely instead of showing empty.
+  const cards = [
+    data.market_summary ? accCard("Overview", `<p class="kv">${data.market_summary}</p>`) : "",
+    data.suggested_price_range ? accCard("Suggested price band", `<p class="kv"><b>${data.suggested_price_range}</b></p>`) : "",
+    (hasContent(data.target_audience) || hasContent(data.buying_motivation))
+      ? accCard("Customer insights", `
+          ${hasContent(data.target_audience) ? `<div class="kv"><b>Who buys this</b></div>${listHtml(data.target_audience)}` : ""}
+          ${hasContent(data.buying_motivation) ? `<div class="kv" style="margin-top:10px;"><b>Why they buy</b></div>${listHtml(data.buying_motivation)}` : ""}
+        `)
+      : "",
+    accCardIfAny("Similar products", data.similar_products),
+    accCardIfAny("Try next", data.products_to_try_next),
+    accCardIfAny("Business opportunities", data.business_opportunities),
+    accCardIfAny("Risks", data.risks, "risk-card"),
+    accCardIfAny("Marketing ideas", data.marketing_ideas),
+    accCardIfAny("Business tips", data.business_tips),
+  ].filter(Boolean);
+
+  const moreCards = cards.length ? `<p class="more-label">More insights</p>${cards.join("")}` : "";
+
+  results.innerHTML = primaryCards + moreCards;
+}
+
+</script>
+
+</body>
+</html>
