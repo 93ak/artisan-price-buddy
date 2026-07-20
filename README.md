@@ -58,7 +58,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 
 | Layer | Technology |
 |--------|------------|
-| LLM | Qwen3-32B via Groq |
+| LLM | Qwen3-27B via Groq |
 | Vision Model | Qwen3.6-27B via Groq |
 | Embeddings | Sentence Transformers (`all-MiniLM-L6-v2`) |
 | Vector Database | ChromaDB |
@@ -85,7 +85,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
                │                      │
                └──────────┬───────────┘
                           ▼
-                   Qwen3-32B Reasoning
+                   Qwen3-27B Reasoning
                           │
                           ▼
       Price Recommendation + Market Comparison +

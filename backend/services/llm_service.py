@@ -10,7 +10,7 @@ load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
-MODEL = "qwen/qwen3-32b"
+MODEL = "qwen/qwen3.6-27b"
 
 
 def strip_think(raw: str) -> str:
@@ -135,11 +135,13 @@ def build_system(rag_context: str = "", cross_session_context: str = "") -> str:
 async def call_llm(messages: list, system: str) -> str:
     response = await client.chat.completions.create(
         model=MODEL,
-        messages=[{"role": "system", "content": "/no_think\n\n" + system}] + messages,
+        messages=[{"role": "system", "content": system}] + messages,   # ← drop the "/no_think\n\n" prefix, it did nothing on 3.6-27b
         temperature=0.1,
-        max_tokens=1200,
+        max_tokens=1800,          # ← a bit more headroom
+        reasoning_effort="none",  # ← ask it not to reason much at all (3.6-27b supports this)
+        reasoning_format="hidden" # ← and hide/strip any reasoning it does produce from the output
     )
-    return strip_think(response.choices[0].message.content)
+    return strip_think(response.choices[0].message.content)  # harmless no-op safety net now
 
 
 def sanitize_json(raw: str) -> str:

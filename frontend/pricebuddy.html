@@ -3,343 +3,337 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Price Buddy v3</title>
+<title>Price Buddy</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, -apple-system, sans-serif; background: #f0ede8; height: 100vh; display: flex; overflow: hidden; }
-
-/* Sidebar */
-.sidebar { width: 240px; background: #fff; border-right: 0.5px solid #e5e5e5; display: flex; flex-direction: column; flex-shrink: 0; height: 100vh; overflow: hidden; }
-.sidebar-head { padding: 1rem 1.25rem; border-bottom: 0.5px solid #e8e8e8; flex-shrink: 0; }
-.sidebar-logo { font-size: 16px; font-weight: 700; color: #111; display: flex; align-items: center; gap: 8px; }
-.sidebar-logo i { color: #7a1212; }
-.sidebar-tagline { font-size: 11px; color: #aaa; margin-top: 2px; }
-.sidebar-section { padding: 0.75rem 1rem 0.5rem; font-size: 11px; font-weight: 600; color: #bbb; letter-spacing: 0.06em; text-transform: uppercase; flex-shrink: 0; }
-.session-item { padding: 8px 1rem; cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
-.session-item:hover { background: #f7f7f5; border-left-color: #e8c8c8; }
-.session-item.active { background: #fbeeee; border-left-color: #7a1212; }
-.session-name { font-size: 13px; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
-.new-chat-btn { margin: 0.75rem 1rem; padding: 9px 12px; border: 0.5px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; color: #555; display: flex; align-items: center; gap: 6px; transition: all 0.15s; flex-shrink: 0; }
-.new-chat-btn:hover { background: #f0f0f0; }
-.sidebar-empty { font-size: 12px; color: #ccc; padding: 0.5rem 1rem; font-style: italic; }
-#session-list { overflow-y: auto; flex: 1; }
-
-/* Main */
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow: hidden; }
-.topbar { padding: 0.875rem 1.5rem; background: #fff; border-bottom: 0.5px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.topbar-title { font-size: 15px; font-weight: 600; color: #111; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 5px; }
-.status-dot.online { background: #1d9e75; }
-.status-text { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
-
-/* Chat area */
-.chat-area { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-.messages-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
-.msgs { flex: 1; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
-.msg { display: flex; gap: 10px; align-items: flex-start; }
-.msg.user { flex-direction: row-reverse; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
-.msg.assistant .avatar { background: #fbeeee; color: #7a1212; border: 0.5px solid #e8c8c8; }
-.msg.user .avatar { background: #7a1212; color: #fff; font-size: 10px; }
-.bubble { padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.6; max-width: 75%; word-wrap: break-word; white-space: pre-wrap; }
-.msg.assistant .bubble { background: #fff; color: #111; border: 0.5px solid #e5e5e5; }
-.msg.user .bubble { background: #7a1212; color: #fff; }
-.typing { display: flex; gap: 4px; align-items: center; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: #aaa; animation: blink 1.2s infinite; }
-.dot:nth-child(2) { animation-delay: 0.2s; }
-.dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
-
-/* ── Follow-up question cards ─────────────────────────────────────────────── */
-.fq-card {
-  background: #fdf5f5;
-  border: 1.5px solid #e8c8c8;
-  border-radius: 14px;
-  padding: 14px 16px;
-  max-width: 85%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+:root{
+  --maroon:#7a1212; --maroon-dark:#5c0d0d; --cream:#f0ede8; --card-bg:#fff;
+  --line:#e8e2da; --line-soft:#efe9e1; --ink:#1c1a17; --ink-soft:#8a8378;
+  --blush:#fdf5f5; --blush-line:#e8c8c8;
 }
-.fq-question {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111;
-  line-height: 1.4;
-}
-.fq-sub { font-size: 12px; color: #888; margin-top: 2px; }
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--cream); min-height: 100vh; color: var(--ink); }
 
-/* Star rating input */
-.star-row { display: flex; gap: 6px; align-items: center; }
-.star {
-  font-size: 28px;
-  cursor: pointer;
-  color: #ddd;
-  transition: color 0.12s, transform 0.1s;
-  line-height: 1;
-  user-select: none;
-}
-.star:hover, .star.lit { color: #f5a623; }
-.star:hover { transform: scale(1.15); }
-.star-label {
-  font-size: 12px;
-  color: #7a1212;
-  min-height: 18px;
-  margin-top: 4px;
-  font-style: italic;
-}
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.topbar { position: sticky; top:0; z-index: 20; padding: 0.85rem 1.25rem; background: rgba(240,237,232,0.92); backdrop-filter: blur(8px); border-bottom: 0.5px solid var(--line); display:flex; align-items:center; gap:12px; }
+.icon-btn { width:36px; height:36px; border-radius:9px; border:0.5px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#666; font-size:16px; transition:all .15s; flex-shrink:0; }
+.icon-btn:hover { border-color: var(--maroon); color: var(--maroon); }
+.topbar-brand { display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; }
+.topbar-brand i { color: var(--maroon); }
+.topbar-session { font-size:12.5px; color: var(--ink-soft); margin-left:2px; }
+.topbar-spacer { flex:1; }
+.status-text { font-size:11.5px; color:#999; display:flex; align-items:center; gap:5px; }
+.status-dot { width:7px; height:7px; border-radius:50%; background:#ccc; }
+.status-dot.online { background:#1d9e75; }
 
-/* Number input */
-.num-row { display: flex; gap: 8px; align-items: center; }
-.num-input {
-  flex: 1;
-  font-size: 22px;
-  font-weight: 600;
-  padding: 10px 14px;
-  border: 1.5px solid #e8c8c8;
-  border-radius: 10px;
-  outline: none;
-  color: #111;
-  background: #fff;
-  max-width: 180px;
-}
-.num-input:focus { border-color: #7a1212; }
-.num-unit { font-size: 14px; color: #888; font-weight: 500; }
+/* ── Sidebar drawer (collapsed by default) ─────────────────────────────── */
+.drawer-overlay { position:fixed; inset:0; background:rgba(20,15,10,0.28); z-index:29; opacity:0; pointer-events:none; transition:opacity .2s; }
+.drawer-overlay.open { opacity:1; pointer-events:auto; }
+.drawer { position:fixed; top:0; left:0; bottom:0; width:280px; max-width:85vw; background:#fff; z-index:30; box-shadow:2px 0 24px rgba(0,0,0,0.12); transform:translateX(-100%); transition:transform .22s ease; display:flex; flex-direction:column; }
+.drawer.open { transform:translateX(0); }
+.drawer-head { padding:1.1rem 1.25rem 0.9rem; border-bottom:0.5px solid var(--line-soft); }
+.drawer-title { font-size:14px; font-weight:700; }
+.drawer-close { position:absolute; top:14px; right:14px; }
+.drawer-new { margin:0.9rem 1rem; padding:10px 12px; border:1px solid var(--maroon); border-radius:9px; background:var(--blush); color:var(--maroon); font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:7px; }
+.drawer-new:hover { background:#fbeeee; }
+.drawer-section { padding:0.4rem 1.1rem 0.4rem; font-size:10.5px; font-weight:700; color:#c2b9ab; letter-spacing:.07em; text-transform:uppercase; }
+.drawer-list { overflow-y:auto; flex:1; padding-bottom:1rem; }
+.drawer-item { margin:0 0.75rem 4px; padding:9px 10px; border-radius:9px; cursor:pointer; transition:background .12s; }
+.drawer-item:hover { background:#f7f4ef; }
+.drawer-item-name { font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drawer-item-meta { font-size:11px; color:#b6ada0; margin-top:1px; }
+.drawer-empty { font-size:12px; color:#cfc7ba; font-style:italic; padding:0.5rem 1.1rem; }
 
-/* Choice card (multi-option select) */
-.choice-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.choice-opt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border: 1.5px solid #e8d8d8;
-  border-radius: 10px;
-  cursor: pointer;
-  background: #fff;
-  font-size: 13px;
-  color: #333;
-  transition: all 0.12s;
-  user-select: none;
-}
-.choice-opt:hover { border-color: #7a1212; background: #fdf5f5; }
-.choice-opt.selected { border-color: #7a1212; background: #fbeeee; color: #7a1212; font-weight: 600; }
-.choice-opt .choice-num {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: #f0e8e8;
-  color: #7a1212;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.choice-opt.selected .choice-num { background: #7a1212; color: #fff; }
+/* ── Main scroll column ─────────────────────────────────────────────────── */
+.main-scroll { max-width: 640px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+.view { display:flex; flex-direction:column; }
+.hidden { display:none !important; }
 
-/* Photo upload (optional, start form) */
-.photo-upload-wrap { margin-top: 0.5rem; }
-.photo-label { display: block; font-size: 13px; font-weight: 600; color: #7a1212; margin-bottom: 6px; }
-.photo-label span { font-weight: 400; color: #aaa; font-size: 11px; margin-left: 6px; }
-.photo-drop {
-  border: 1.5px dashed #e8d8d8; border-radius: 10px; background: #fafafa;
-  padding: 14px; text-align: center; cursor: pointer; transition: all .15s; position: relative;
-}
-.photo-drop:hover, .photo-drop.drag { border-color: #7a1212; background: #fbeeee; }
-.photo-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-.photo-drop-text { font-size: 12.5px; color: #999; pointer-events: none; }
-.photo-preview-row {
-  display: none; align-items: center; gap: 10px;
-  background: #fdf5f5; border: 1px solid #e8d8d8; border-radius: 10px; padding: 8px 10px;
-}
-.photo-preview-row.active { display: flex; }
-.photo-preview-row img { width: 48px; height: 48px; object-fit: cover; border-radius: 7px; }
-.photo-preview-info { flex: 1; min-width: 0; }
-.photo-preview-name { font-size: 12px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.photo-preview-status { font-size: 11px; color: #999; margin-top: 2px; }
-.photo-preview-status.ok { color: #2e6b4e; }
-.photo-preview-status.err { color: #7a1212; }
-.photo-remove { background: none; border: none; color: #aaa; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
-.photo-remove:hover { color: #7a1212; }
+/* ── Landing: pick type or speak ────────────────────────────────────────── */
+#view-landing { min-height: calc(100vh - 64px); align-items:center; justify-content:center; text-align:center; gap:0; }
+.landing-eyebrow { font-size:12px; font-weight:700; color:var(--maroon); letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px; }
+.landing-title { font-size:26px; font-weight:800; line-height:1.25; margin-bottom:10px; }
+.landing-sub { font-size:14px; color:var(--ink-soft); max-width:380px; margin: 0 auto 2.25rem; line-height:1.55; }
+.mode-choices { display:flex; gap:14px; width:100%; max-width:420px; flex-wrap:wrap; justify-content:center; }
+.mode-card { flex:1; min-width:150px; background:#fff; border:1.5px solid var(--line); border-radius:16px; padding:1.6rem 1.1rem; cursor:pointer; transition:all .15s; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.mode-card:hover { border-color:var(--maroon); transform:translateY(-2px); box-shadow:0 8px 20px rgba(122,18,18,0.08); }
+.mode-card i { font-size:30px; color:var(--maroon); }
+.mode-card-label { font-size:14.5px; font-weight:700; }
+.mode-card-sub { font-size:11.5px; color:var(--ink-soft); }
 
-/* Submit button inside question card */
-.fq-submit {
-  align-self: flex-start;
-  padding: 8px 20px;
-  background: #7a1212;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.fq-submit:hover { background: #5c0d0d; }
-.fq-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+/* ── Input view ──────────────────────────────────────────────────────────── */
+#view-input { min-height: calc(100vh - 64px); justify-content:center; gap:1.1rem; padding-top:2rem; padding-bottom:2rem; }
+.input-back { align-self:flex-start; display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; margin-bottom:0.2rem; }
+.input-back:hover { color:var(--maroon); }
+.input-heading { font-size:20px; font-weight:800; margin-bottom:2px; }
+.input-heading-sub { font-size:13px; color:var(--ink-soft); margin-bottom:0.6rem; }
 
-/* Results panel */
-.results-panel { width: 320px; border-left: 0.5px solid #e8e8e8; background: #fafafa; overflow-y: auto; flex-shrink: 0; padding: 1rem; display: flex; flex-direction: column; gap: 10px; height: 100%; }
-.panel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: #ccc; font-size: 13px; text-align: center; padding: 2rem; }
-.panel-empty i { font-size: 40px; }
-.card { background: #fff; border: 0.5px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
-.card-title { font-size: 11px; font-weight: 600; color: #888; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
-.card-title i { font-size: 14px; }
-.brow { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 0.5px solid #f2f2f2; color: #666; }
-.brow:last-child { border: none; }
-.brow.total { font-size: 13.5px; font-weight: 600; color: #111; border-top: 1px solid #e8e8e8; margin-top: 4px; padding-top: 6px; }
-.brow .val { color: #111; font-weight: 500; }
-.brow.loss .val { color: #a32d2d; font-weight: 600; }
-.brow.profit .val { color: #0f6e56; font-weight: 600; }
-.tiers { display: flex; flex-direction: column; gap: 6px; }
-.tier { border: 0.5px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; }
-.tier.rec { border: 2px solid #7a1212; background: #fdf5f5; }
-.tier-left { display: flex; flex-direction: column; gap: 2px; }
-.tier-label { font-size: 12px; font-weight: 600; color: #111; display: flex; align-items: center; gap: 6px; }
-.tier-badge { font-size: 9px; background: #fbeeee; color: #7a1212; padding: 2px 6px; border-radius: 100px; font-weight: 600; }
-.tier-note { font-size: 11px; color: #888; }
-.tier-price { font-size: 20px; font-weight: 700; color: #111; }
-.mbar-row { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 6px; }
-.mbar-label { width: 45px; color: #888; text-align: right; flex-shrink: 0; }
-.mbar-track { flex: 1; height: 7px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
-.mbar-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
-.mbar-val { width: 45px; color: #111; font-weight: 500; font-size: 12px; }
-.your-pos { font-size: 12px; color: #555; margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; }
-.your-dot { width: 7px; height: 7px; border-radius: 50%; background: #e24b4a; flex-shrink: 0; margin-top: 4px; }
-.conf-bar { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; margin: 6px 0; }
-.conf-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
-.conf-text { font-size: 11px; color: #888; }
-.missing { display: flex; flex-direction: column; gap: 4px; }
-.missing-item { font-size: 12px; color: #885f0b; display: flex; align-items: flex-start; gap: 5px; }
-.missing-item i { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-.source-link { font-size: 11px; color: #7a1212; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.source-link:hover { text-decoration: underline; }
+.mic-stage { display:flex; flex-direction:column; align-items:center; gap:10px; padding: 1.4rem 0 0.4rem; }
+.mic-btn-lg { width:84px; height:84px; border-radius:50%; border:none; cursor:pointer; background:var(--maroon); color:#fff; display:flex; align-items:center; justify-content:center; font-size:32px; transition:background .15s, transform .1s; position:relative; }
+.mic-btn-lg:hover { background:var(--maroon-dark); }
+.mic-btn-lg:active { transform:scale(0.96); }
+.mic-btn-lg.recording { background:#e24b4a; animation:mic-pulse 1.4s infinite; }
+.mic-btn-lg.unsupported { background:#ccc; cursor:not-allowed; }
+@keyframes mic-pulse { 0%{box-shadow:0 0 0 0 rgba(226,75,74,.45);} 70%{box-shadow:0 0 0 18px rgba(226,75,74,0);} 100%{box-shadow:0 0 0 0 rgba(226,75,74,0);} }
+.mic-status-lg { font-size:13px; color:#999; }
+.mic-status-lg.live { color:var(--maroon); font-weight:700; }
 
-/* Input area */
-.input-area { padding: 0.75rem 1.5rem 1rem; border-top: 0.5px solid #e8e8e8; background: #fff; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
-textarea { flex: 1; font-size: 14px; font-family: inherit; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; resize: none; min-height: 44px; max-height: 120px; line-height: 1.5; color: #111; background: #fafafa; outline: none; }
-textarea:focus { border-color: #7a1212; background: #fff; }
-.send-btn { width: 44px; height: 44px; border-radius: 10px; border: none; background: #7a1212; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; flex-shrink: 0; transition: opacity 0.15s; }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.send-btn:not(:disabled):hover { background: #5c0d0d; }
+.desc-box { border:1.5px solid var(--line); border-radius:14px; background:#fff; padding:0.9rem 1rem; transition:border-color .15s; }
+.desc-box.focused { border-color:var(--maroon); }
+.desc-textarea { width:100%; border:none; outline:none; resize:none; font-family:inherit; font-size:14.5px; line-height:1.6; color:var(--ink); min-height:90px; max-height:260px; background:transparent; }
+.desc-textarea::placeholder { color:#c2bcb1; }
+.mode-switch-link { font-size:12px; color:var(--maroon); text-decoration:underline; cursor:pointer; text-align:center; margin-top:2px; }
 
-/* Start form */
-.start-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:2rem; overflow-y:auto; }
-.start-card { background:#fff; border:1.5px solid #e8d8d8; border-radius:20px; padding:2.5rem 2.5rem; max-width:520px; width:100%; }
-.start-title { font-size:22px; font-weight:800; color:#111; margin-bottom:4px; }
-.start-sub { font-size:13px; color:#999; margin-bottom:1.75rem; }
-.field { margin-bottom:1.1rem; }
-.field label { display:block; font-size:13px; font-weight:600; color:#7a1212; margin-bottom:6px; }
-.field input { width:100%; font-size:16px; padding:12px 14px; border:1.5px solid #e8d8d8; border-radius:10px; outline:none; color:#111; background:#fafafa; }
-.field input:focus { border-color:#7a1212; background:#fff; }
-.start-btn { width:100%; margin-top:0.5rem; padding:14px; background:#7a1212; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; transition:background .15s; }
-.start-btn:hover { background:#5c0d0d; }
-.start-btn:disabled { opacity:.5; cursor:not-allowed; }
+.photo-row { display:flex; align-items:center; gap:10px; }
+.add-photo-btn { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--maroon); font-weight:600; cursor:pointer; background:var(--blush); border:1px solid var(--blush-line); border-radius:100px; padding:8px 14px; white-space:nowrap; transition:all .12s; }
+.add-photo-btn:hover { background:#fbeeee; }
+.add-photo-btn span { font-weight:400; color:#b6ada0; }
+.add-photo-btn input { display:none; }
+.photo-preview-row { display:none; align-items:center; gap:10px; background:var(--blush); border:1px solid var(--blush-line); border-radius:12px; padding:9px 11px; }
+.photo-preview-row.active { display:flex; }
+.photo-preview-row img { width:46px; height:46px; object-fit:cover; border-radius:8px; }
+.photo-preview-info { flex:1; min-width:0; }
+.photo-preview-name { font-size:12px; font-weight:600; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.photo-preview-status { font-size:11px; color:#999; margin-top:2px; }
+.photo-remove { background:none; border:none; color:#b6ada0; cursor:pointer; font-size:17px; padding:0 4px; line-height:1; }
+.photo-remove:hover { color:var(--maroon); }
 
-/* Pills */
-.pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0.75rem 1.5rem; background: #fff; border-bottom: 0.5px solid #f2f2f2; flex-shrink: 0; }
-.pill { font-size: 12px; padding: 5px 12px; border-radius: 100px; border: 0.5px solid #ccc; color: #555; cursor: pointer; background: #f9f9f9; transition: all 0.15s; }
-.pill:hover { background: #fbeeee; border-color: #7a1212; color: #7a1212; }
-.hidden { display: none !important; }
+.input-error { font-size:12.5px; color:#a32d2d; min-height:16px; }
+.submit-btn { padding:14px; background:var(--maroon); color:#fff; border:none; border-radius:11px; font-size:15px; font-weight:700; cursor:pointer; transition:background .15s; }
+.submit-btn:hover { background:var(--maroon-dark); }
+.submit-btn:disabled { opacity:.5; cursor:not-allowed; }
 
-@media (max-width: 800px) {
-  .sidebar { display: none; }
-  .results-panel { display: none; }
+/* ── Loading view ────────────────────────────────────────────────────────── */
+#view-loading { min-height: calc(100vh - 64px); align-items:center; justify-content:center; gap:1.1rem; text-align:center; }
+.spinner { width:46px; height:46px; border-radius:50%; border:3px solid var(--line); border-top-color: var(--maroon); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size:14px; color:var(--ink-soft); min-height:20px; transition:opacity .2s; }
+
+/* ── Flow: question rounds + results ────────────────────────────────────── */
+#view-flow { padding-top: 1.5rem; gap: 1.75rem; }
+.round { display:flex; flex-direction:column; gap:12px; transition: opacity .2s; }
+.round.round-disabled { opacity:0.55; pointer-events:none; }
+.round-eyebrow { font-size:11px; font-weight:700; color:var(--maroon); letter-spacing:.06em; text-transform:uppercase; }
+
+.fq-card { background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:15px 17px; display:flex; flex-direction:column; gap:12px; }
+.fq-question { font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.4; }
+.fq-sub { font-size:12px; color:var(--ink-soft); margin-top:2px; }
+
+.star-row { display:flex; gap:6px; align-items:center; }
+.star { font-size:30px; cursor:pointer; color:#e2ddd3; transition:color .12s, transform .1s; line-height:1; user-select:none; }
+.star:hover, .star.lit { color:#f5a623; }
+.star:hover { transform:scale(1.15); }
+.star-label { font-size:12px; color:var(--maroon); min-height:18px; margin-top:4px; font-style:italic; }
+
+.num-row { display:flex; gap:8px; align-items:center; }
+.num-input { flex:1; font-size:22px; font-weight:700; padding:10px 14px; border:1.5px solid var(--blush-line); border-radius:10px; outline:none; color:var(--ink); background:#fff; max-width:200px; }
+.num-input:focus { border-color: var(--maroon); }
+.num-input.text-style { font-size:14.5px; font-weight:400; max-width:100%; }
+.num-unit { font-size:14px; color:var(--ink-soft); font-weight:500; }
+
+.choice-grid { display:flex; flex-direction:column; gap:7px; }
+.choice-opt { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid var(--line-soft); border-radius:10px; cursor:pointer; background:#fff; font-size:13.5px; color:#333; transition:all .12s; user-select:none; }
+.choice-opt:hover { border-color:var(--maroon); background:var(--blush); }
+.choice-opt.selected { border-color:var(--maroon); background:#fbeeee; color:var(--maroon); font-weight:700; }
+.choice-opt .choice-num { width:22px; height:22px; border-radius:50%; background:#f0e8e8; color:var(--maroon); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.choice-opt.selected .choice-num { background:var(--maroon); color:#fff; }
+
+.fq-submit { align-self:flex-start; padding:10px 22px; background:var(--maroon); color:#fff; border:none; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; transition:background .15s; }
+.fq-submit:hover { background:var(--maroon-dark); }
+.fq-submit:disabled { opacity:.4; cursor:not-allowed; }
+.round-answered-tag { display:flex; align-items:center; gap:6px; font-size:12px; color:#1d9e75; font-weight:600; }
+
+/* ── Results ─────────────────────────────────────────────────────────────── */
+#results-block { display:flex; flex-direction:column; gap:12px; }
+.results-heading { font-size:12px; font-weight:700; color:var(--maroon); letter-spacing:.06em; text-transform:uppercase; margin-top:6px; display:flex; align-items:center; gap:6px; }
+.card { background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:1.1rem 1.2rem; }
+.card-title { font-size:11px; font-weight:700; color:#a39a8c; letter-spacing:.06em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.card-title i { font-size:14px; }
+.brow { display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:0.5px solid #f4f0ea; color:#666; gap:10px; }
+.brow:last-child { border:none; }
+.brow.total { font-size:15px; font-weight:700; color:var(--ink); border-top:1.5px solid var(--line-soft); margin-top:5px; padding-top:9px; }
+.brow .val { color:var(--ink); font-weight:600; flex-shrink:0; }
+.brow.loss .val { color:#a32d2d; font-weight:700; }
+.brow.profit .val { color:#0f6e56; font-weight:700; }
+.tiers { display:flex; flex-direction:column; gap:8px; }
+.tier { border:1px solid var(--line-soft); border-radius:10px; padding:10px 13px; display:flex; align-items:center; justify-content:space-between; }
+.tier.rec { border:2px solid var(--maroon); background:var(--blush); }
+.tier-left { display:flex; flex-direction:column; gap:2px; }
+.tier-label { font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px; }
+.tier-badge { font-size:9px; background:#fbeeee; color:var(--maroon); padding:2px 7px; border-radius:100px; font-weight:700; }
+.tier-note { font-size:11.5px; color:var(--ink-soft); }
+.tier-price { font-size:22px; font-weight:800; color:var(--ink); }
+.mbar-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:7px; }
+.mbar-label { width:45px; color:var(--ink-soft); text-align:right; flex-shrink:0; }
+.mbar-track { flex:1; height:8px; background:#f4f0ea; border-radius:4px; overflow:hidden; }
+.mbar-fill { height:100%; border-radius:4px; transition:width .7s ease; }
+.mbar-val { width:48px; color:var(--ink); font-weight:600; font-size:12px; }
+.your-pos { font-size:12.5px; color:#555; margin-top:8px; display:flex; align-items:flex-start; gap:6px; }
+.your-dot { width:7px; height:7px; border-radius:50%; background:#e24b4a; flex-shrink:0; margin-top:4px; }
+.conf-bar { height:7px; background:#f4f0ea; border-radius:4px; overflow:hidden; margin:7px 0; }
+.conf-fill { height:100%; border-radius:4px; transition:width .7s ease; }
+.conf-text { font-size:12px; color:var(--ink-soft); }
+.missing { display:flex; flex-direction:column; gap:5px; }
+.missing-item { font-size:12.5px; color:#8a5c0b; display:flex; align-items:flex-start; gap:6px; }
+.missing-item i { font-size:13px; flex-shrink:0; margin-top:1px; }
+.source-link { font-size:11.5px; color:var(--maroon); text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; padding:2px 0; }
+.source-link:hover { text-decoration:underline; }
+
+/* ── Refine box under results ────────────────────────────────────────────── */
+.refine-box { border:1.5px solid var(--line); border-radius:14px; background:#fff; padding:0.9rem 1rem; display:flex; gap:8px; align-items:flex-end; margin-top:6px; }
+.refine-box textarea { flex:1; border:none; outline:none; resize:none; font-family:inherit; font-size:13.5px; color:var(--ink); background:transparent; max-height:100px; min-height:22px; }
+.refine-send { width:38px; height:38px; border-radius:9px; border:none; background:var(--maroon); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.refine-send:disabled { opacity:.4; cursor:not-allowed; }
+.refine-label { font-size:11.5px; color:var(--ink-soft); margin-bottom:2px; }
+
+/* ── Session viewer (read-only past analysis) ───────────────────────────── */
+#view-session { padding-top:1.5rem; gap:18px; }
+.session-desc-card { padding:12px 15px; border-radius:12px; font-size:13.5px; line-height:1.55; background:var(--blush); border:1px solid var(--blush-line); color:var(--maroon); font-style:italic; }
+.session-desc-card i { margin-right:6px; font-style:normal; }
+.session-round { display:flex; flex-direction:column; gap:12px; }
+.session-round-eyebrow { font-size:11px; font-weight:700; color:var(--maroon); letter-spacing:.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px; }
+.fq-card.readonly { background:#fdfcfa; }
+.ro-key { font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:2px; }
+.ro-value { font-size:14.5px; font-weight:700; color:var(--ink); background:#faf7f2; border:1px solid var(--line-soft); border-radius:8px; padding:8px 12px; display:inline-block; }
+.session-floor-chip { display:inline-flex; align-items:baseline; gap:6px; font-size:22px; font-weight:800; color:var(--maroon); background:var(--blush); border:1px solid var(--blush-line); border-radius:10px; padding:8px 14px; margin-bottom:10px; }
+.session-floor-chip span { font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em; }
+.session-analysis-text { font-size:13.5px; line-height:1.65; color:var(--ink); }
+.session-analysis-text strong { color:var(--maroon); }
+
+@media (max-width: 480px) {
+  .mode-choices { flex-direction:column; }
+  .landing-title { font-size:22px; }
 }
 </style>
 </head>
 <body>
 
-<div class="sidebar">
-  <div class="sidebar-head">
-    <div class="sidebar-logo"><i class="ti ti-tag"></i> Price Buddy</div>
-    <div class="sidebar-tagline">Artisan pricing assistant</div>
-    <a href="index.html" style="display:inline-block;margin-top:8px;font-size:11px;color:#7a1212;text-decoration:none;"><i class="ti ti-arrow-left"></i> Artisan Buddy home</a>
-  </div>
-  <button class="new-chat-btn" onclick="newSession()">
-    <i class="ti ti-plus" style="font-size:15px"></i> New analysis
-  </button>
-  <div class="sidebar-section">Recent</div>
-  <div id="session-list"><div class="sidebar-empty">No sessions yet</div></div>
+<div class="topbar">
+  <button class="icon-btn" id="drawer-btn" onclick="openDrawer()" aria-label="Past analyses"><i class="ti ti-menu-2"></i></button>
+  <div class="topbar-brand"><i class="ti ti-tag"></i> Price Buddy</div>
+  <div class="topbar-session" id="topbar-session"></div>
+  <div class="topbar-spacer"></div>
+  <div class="status-text"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking…</span></div>
 </div>
 
-<div class="main">
-  <div class="topbar">
-    <div class="topbar-title" id="chat-title">New analysis</div>
-    <div class="status-text"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking backend…</span></div>
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head" style="position:relative">
+    <div class="drawer-title">Past analyses</div>
+    <button class="icon-btn drawer-close" onclick="closeDrawer()" aria-label="Close"><i class="ti ti-x"></i></button>
   </div>
+  <button class="drawer-new" onclick="closeDrawer(); resetFlow();"><i class="ti ti-plus"></i> New analysis</button>
+  <div class="drawer-section">Recent</div>
+  <div class="drawer-list" id="drawer-list"><div class="drawer-empty">No sessions yet</div></div>
+</div>
 
-  <div class="chat-area">
-    <div class="messages-col">
-      <div class="start-wrap" id="start-wrap">
-        <div class="start-card">
-          <div class="start-title">Let's price your product</div>
-          <div class="start-sub">Fill in the basics and I'll work out a fair price for you.</div>
-          <div class="field"><label>Product name</label><input id="f-name" placeholder="e.g. Hand-painted clay diya"/></div>
-          <div class="field"><label>Material cost (₹)</label><input id="f-cost" type="number" min="0" placeholder="e.g. 120"/></div>
-          <div class="field"><label>Hours taken to make</label><input id="f-exp" type="number" min="0" step="0.5" placeholder="e.g. 3"/></div>
-          <div class="field"><label>Number of products in a set</label><input id="f-qty" type="number" min="1" placeholder="e.g. 10"/></div>
+<div class="main-scroll" id="main-scroll">
 
-          <div class="photo-upload-wrap">
-            <label class="photo-label">Product photo <span>optional — we'll read quality from it</span></label>
-            <div class="photo-drop" id="photo-drop">
-              <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp"/>
-              <div class="photo-drop-text">📷 Tap to upload a photo</div>
-            </div>
-            <div class="photo-preview-row" id="photo-preview-row">
-              <img id="photo-preview-img" src="" alt=""/>
-              <div class="photo-preview-info">
-                <div class="photo-preview-name" id="photo-preview-name"></div>
-                <div class="photo-preview-status" id="photo-preview-status">Ready</div>
-              </div>
-              <button class="photo-remove" onclick="removePhoto()" title="Remove">✕</button>
-            </div>
-          </div>
-          <button class="start-btn" id="start-btn" onclick="startAnalysis()">Get my price ↑</button>
-        </div>
+  <!-- LANDING: choose type or speak -->
+  <section class="view" id="view-landing">
+    <div class="landing-eyebrow">Let's price your work</div>
+    <div class="landing-title">How do you want to<br/>tell me about it?</div>
+    <div class="landing-sub">Describe your product — what it is, what it cost you, how long it took. I'll ask if I need more.</div>
+    <div class="mode-choices">
+      <div class="mode-card" onclick="chooseMode('type')">
+        <i class="ti ti-keyboard"></i>
+        <div class="mode-card-label">Type it out</div>
+        <div class="mode-card-sub">Write a quick description</div>
       </div>
-
-      <div class="pills hidden" id="pills">
-        <span class="pill" onclick="usePill(this)">Clay diyas, ₹120 materials, 10 pieces, 2 hrs</span>
-        <span class="pill" onclick="usePill(this)">Crochet teddy bear, ~5 hrs, no packaging</span>
-        <span class="pill" onclick="usePill(this)">Hand-printed tote bags, ₹80/bag materials</span>
-        <span class="pill" onclick="usePill(this)">Macrame wall hanging, 4 hrs, ₹200 materials</span>
-      </div>
-
-      <div class="msgs hidden" id="msgs"></div>
-
-      <div class="input-area hidden" id="input-area">
-        <textarea id="inp" rows="1" placeholder="Reply…" oninput="autosize(this)" onkeydown="handleKey(event)"></textarea>
-        <button class="send-btn" id="sbtn" onclick="send()" aria-label="Send"><i class="ti ti-send"></i></button>
+      <div class="mode-card" onclick="chooseMode('speak')">
+        <i class="ti ti-microphone"></i>
+        <div class="mode-card-label">Speak instead</div>
+        <div class="mode-card-sub">Talk me through it</div>
       </div>
     </div>
+  </section>
 
-    <div class="results-panel" id="results-panel">
-      <div class="panel-empty" id="panel-empty">
-        <i class="ti ti-calculator"></i>
-        <span>Your pricing breakdown will appear here after analysis</span>
-      </div>
-      <div id="panel-cards" class="hidden"></div>
+  <!-- INPUT: text box or mic, plus optional photo -->
+  <section class="view hidden" id="view-input">
+    <div class="input-back" onclick="backToLanding()"><i class="ti ti-arrow-left"></i> Back</div>
+
+    <div id="input-type-block" class="hidden">
+      <div class="input-heading">Tell me about your product</div>
+      <div class="input-heading-sub">What it is, what it cost, how long it took to make.</div>
     </div>
-  </div>
+    <div id="input-speak-block" class="hidden">
+      <div class="input-heading">Tap the mic and talk me through it</div>
+      <div class="input-heading-sub">What it is, what it cost, how long it took to make.</div>
+    </div>
+
+    <div class="mic-stage hidden" id="mic-stage">
+      <button class="mic-btn-lg" id="mic-btn" onclick="toggleRecording()" aria-label="Speak your description">
+        <i class="ti ti-microphone" id="mic-icon"></i>
+      </button>
+      <div class="mic-status-lg" id="mic-status">Tap to start speaking</div>
+    </div>
+
+    <div class="desc-box" id="desc-box">
+      <textarea id="desc-inp" class="desc-textarea" rows="3"
+        placeholder="e.g. I made a crochet tote bag using cotton yarn. It took me around six hours. I bought the yarn for about ₹250."
+        oninput="autosize(this)"
+        onfocus="document.getElementById('desc-box').classList.add('focused')"
+        onblur="document.getElementById('desc-box').classList.remove('focused')"></textarea>
+    </div>
+    <div class="mode-switch-link" id="mode-switch-link" onclick="switchMode()"></div>
+
+    <div class="photo-row">
+      <label class="add-photo-btn" for="photo-input">
+        <i class="ti ti-camera"></i> Add a picture <span>(optional)</span>
+        <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp"/>
+      </label>
+    </div>
+    <div class="photo-preview-row" id="photo-preview-row">
+      <img id="photo-preview-img" src="" alt=""/>
+      <div class="photo-preview-info">
+        <div class="photo-preview-name" id="photo-preview-name"></div>
+        <div class="photo-preview-status" id="photo-preview-status">Ready</div>
+      </div>
+      <button class="photo-remove" onclick="removePhoto()" title="Remove">✕</button>
+    </div>
+
+    <div class="input-error" id="input-error"></div>
+    <button class="submit-btn" id="submit-btn" onclick="submitDescription()">Get my price ↑</button>
+  </section>
+
+  <!-- LOADING -->
+  <section class="view hidden" id="view-loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Working it out…</div>
+  </section>
+
+  <!-- FLOW: question rounds + results -->
+  <section class="view hidden" id="view-flow">
+    <div id="qa-container" style="display:flex; flex-direction:column; gap:1.75rem;"></div>
+    <div id="results-block"></div>
+    <div class="refine-box" id="refine-box" style="display:none; flex-direction:column;">
+      <div class="refine-label">Want to add or change something?</div>
+      <div style="display:flex; gap:8px; align-items:flex-end; width:100%;">
+        <textarea id="refine-inp" rows="1" placeholder="e.g. actually it took 8 hours, not 6" oninput="autosize(this)" onkeydown="handleRefineKey(event)"></textarea>
+        <button class="refine-send" id="refine-send" onclick="submitRefine()" aria-label="Send"><i class="ti ti-send"></i></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SESSION VIEWER (read-only past analysis) -->
+  <section class="view hidden" id="view-session">
+    <div class="input-back" onclick="closeSessionView()"><i class="ti ti-arrow-left"></i> Back to new analysis</div>
+    <div id="session-msgs" style="display:flex; flex-direction:column; gap:10px;"></div>
+  </section>
+
 </div>
 
 <script>
 const API =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:8080"
     : "https://artisan-price-buddy.onrender.com";
+
 let sessionId = null;
 let busy = false;
+let mode = 'type';
+let qRound = 0;
 
-// ── Star label lookup (mirrors backend STAR_MAPPINGS) ─────────────────────────
-// Must match backend STAR_MAPPINGS exactly — these are shown under stars
 const STAR_LABELS = {
   packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"],
   work_quality:      ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"],
@@ -347,179 +341,274 @@ const STAR_LABELS = {
   uniqueness:           ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"],
   marketplace_platform: ["Offline / local","Instagram / WhatsApp","Meesho / Flipkart","Etsy / Amazon","Own website / boutique"],
 };
+function getStarLabels(field, fallbackLabels) { return STAR_LABELS[field] || fallbackLabels || ["1★","2★","3★","4★","5★"]; }
 
-function getStarLabels(field, fallbackLabels) {
-  // Use backend-locked labels if field is known, otherwise use whatever LLM sent
-  return STAR_LABELS[field] || fallbackLabels || ["1★","2★","3★","4★","5★"];
+/* ── View switching ─────────────────────────────────────────────────────── */
+function showView(name) {
+  ['view-landing','view-input','view-loading','view-flow','view-session'].forEach(id => {
+    document.getElementById(id).classList.toggle('hidden', id !== 'view-' + name);
+  });
 }
 
-// ── Health / session plumbing ─────────────────────────────────────────────────
+/* ── Health + sessions ──────────────────────────────────────────────────── */
 async function checkHealth() {
   try {
     const r = await fetch(API + "/health");
     if (r.ok) {
       document.getElementById("status-dot").classList.add("online");
-      document.getElementById("status-text").textContent = "Backend ready";
+      document.getElementById("status-text").textContent = "Ready";
     } else throw new Error();
-  } catch { document.getElementById("status-text").textContent = "Backend offline"; }
+  } catch { document.getElementById("status-text").textContent = "Offline"; }
 }
 
 async function loadSessions() {
   try {
     const r = await fetch(API + "/history");
     const sessions = await r.json();
-    const list = document.getElementById("session-list");
-    if (!sessions.length) { list.innerHTML = '<div class="sidebar-empty">No sessions yet</div>'; return; }
+    const list = document.getElementById("drawer-list");
+    if (!sessions.length) { list.innerHTML = '<div class="drawer-empty">No sessions yet</div>'; return; }
     list.innerHTML = sessions.map(s => `
-      <div class="session-item ${s.id === sessionId ? 'active' : ''}"
-           onclick="loadSession('${s.id}','${(s.product_type||'Session').replace(/'/g,"\\'")}')">
-        <div class="session-name">${s.product_type || "Unnamed product"}</div>
-        <div class="session-meta">${s.msg_count} messages · ${s.created_at.slice(0,10)}</div>
+      <div class="drawer-item" onclick="viewSession('${s.id}','${(s.product_type||'Session').replace(/'/g,"\\'")}')">
+        <div class="drawer-item-name">${s.product_type || "Unnamed product"}</div>
+        <div class="drawer-item-meta">${s.msg_count} messages · ${s.created_at.slice(0,10)}</div>
       </div>`).join('');
   } catch(e) {}
 }
 
-async function loadSession(id, name) {
-  sessionId = id;
-  document.getElementById("chat-title").textContent = name;
-  document.querySelectorAll(".session-item").forEach(el => el.classList.remove("active"));
-  event.currentTarget?.classList.add("active");
-  const msgs = document.getElementById("msgs");
-  msgs.innerHTML = '';
+function openDrawer() { document.getElementById('drawer').classList.add('open'); document.getElementById('drawer-overlay').classList.add('open'); }
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('drawer-overlay').classList.remove('open'); }
+
+async function viewSession(id, name) {
+  closeDrawer();
+  showView('session');
+  document.getElementById('topbar-session').textContent = name;
+  const wrap = document.getElementById('session-msgs');
+  wrap.innerHTML = '<div style="font-size:13px;color:#aaa">Loading…</div>';
   try {
     const r = await fetch(`${API}/history/${id}`);
     const messages = await r.json();
-    messages.forEach(m => addMsg(m.role, m.content));
-  } catch(e) {}
-}
-
-function newSession() {
-  sessionId = null;
-  document.getElementById("chat-title").textContent = "New analysis";
-  document.getElementById("msgs").innerHTML = "";
-  document.getElementById("msgs").classList.add("hidden");
-  document.getElementById("input-area").classList.add("hidden");
-  document.getElementById("pills").classList.add("hidden");
-  document.getElementById("start-wrap").classList.remove("hidden");
-  ["f-name","f-cost","f-exp","f-qty"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("panel-empty").classList.remove("hidden");
-  document.getElementById("panel-cards").classList.add("hidden");
-  document.getElementById("panel-cards").innerHTML = "";
-}
-
-async function startAnalysis() {
-  if (busy) return;
-  const name = document.getElementById("f-name").value.trim();
-  const cost = document.getElementById("f-cost").value.trim();
-  const exp = document.getElementById("f-exp").value.trim();
-  const qty = document.getElementById("f-qty").value.trim();
-  if (!name || !cost) { alert("Please fill in at least the product name and material cost."); return; }
-
-  busy = true;
-  document.getElementById("start-btn").disabled = true;
-
-  // ── Optional: analyse photo for quality + product hints ──────────────
-  let imageQualityNote = "";
-  let imageProfileUpdates = {};
-  const photoFile = window._photoFile;
-  if (photoFile) {
-    const statusEl = document.getElementById("photo-preview-status");
-    statusEl.textContent = "Analysing photo…";
-    statusEl.className = "photo-preview-status";
-    try {
-      const fd = new FormData();
-      fd.append("image", photoFile);
-      const r = await fetch(API + "/price-image-analyze", { method: "POST", body: fd });
-      if (r.ok) {
-        const img = await r.json();
-        const stars = img.work_quality_stars || 3;
-        const reason = img.work_quality_reason || "";
-        const details = [...(img.product_details || []), ...(img.material_hints || [])].join(", ");
-        imageQualityNote = `Work quality from photo: ${stars} stars (${reason}).${details ? " Visible details: " + details + "." : ""}`;
-        imageProfileUpdates = { work_quality: stars };
-        statusEl.textContent = `Quality read: ${stars}★ — ${reason}`;
-        statusEl.className = "photo-preview-status ok";
+    wrap.innerHTML = '';
+    let roundNum = 0;
+    messages.forEach(m => {
+      if (m.role === 'assistant') {
+        wrap.appendChild(renderHistoryAssistantCard(m.content));
+      } else if (isStructuredAnswer(m.content)) {
+        roundNum += 1;
+        wrap.appendChild(renderHistoryAnswerRound(m.content, roundNum));
       } else {
-        statusEl.textContent = "Couldn't read photo — continuing without it";
-        statusEl.className = "photo-preview-status err";
+        wrap.appendChild(renderHistoryDescriptionCard(m.content));
       }
-    } catch (e) {
-      document.getElementById("photo-preview-status").textContent = "Photo analysis failed — continuing";
-      document.getElementById("photo-preview-status").className = "photo-preview-status err";
-    }
-  }
-
-  const prompt = `Product: ${name}. Material cost: ₹${cost}. Hours to make: ${exp || "not specified"}. Number of products in set: ${qty || "1"}.${imageQualityNote ? " " + imageQualityNote : ""}`;
-
-  document.getElementById("start-wrap").classList.add("hidden");
-  document.getElementById("msgs").classList.remove("hidden");
-  document.getElementById("input-area").classList.remove("hidden");
-  addMsg("user", prompt);
-  showTyping();
-
-  try {
-    const r = await fetch(API + "/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        description: prompt,
-        session_id: null,
-        product_name: name,
-        material_cost: cost,
-        experience: exp,
-        quantity: qty,
-        image_quality_stars: imageProfileUpdates.work_quality || null
-      })
     });
-    removeTyping();
-    if (!r.ok) {
-      const err = await r.json();
-      addMsg("assistant", `Error: ${err.detail || "Something went wrong."}`);
-    } else {
-      const data = await r.json();
-      sessionId = data.session_id;
-      document.getElementById("chat-title").textContent = data.product_type || name;
-      addMsg("assistant", data.chat_reply);
-      renderPanel(data);
-      loadSessions();
-      if (data.follow_up_questions && data.follow_up_questions.length) {
-        renderFollowUpQuestions(data.follow_up_questions);
-      }
-    }
+    if (!messages.length) wrap.innerHTML = '<div style="font-size:13px;color:#aaa">No messages in this session.</div>';
   } catch (e) {
-    removeTyping();
-    addMsg("assistant", "Cannot reach the backend. Make sure FastAPI is running on port 8080.");
+    wrap.innerHTML = '<div style="font-size:13px;color:#a32d2d">Could not load this session.</div>';
   }
-  busy = false;
-  document.getElementById("start-btn").disabled = false;
 }
 
-function usePill(el) {
-  document.getElementById("inp").value = el.textContent;
-  document.getElementById("pills").classList.add("hidden");
-  send();
+/* ── Reconstructing read-only answer cards from stored history text ─────── */
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function autosize(el) {
-  el.style.height = "auto";
-  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+// Our own chat summaries always look like "field: value. field: value." —
+// free-text descriptions don't have that shape, so this is a safe heuristic.
+function isStructuredAnswer(content) {
+  return /:\s*(₹?\d|[A-Za-z])/.test(content) && /\.\s+[A-Z]/.test(content + '.');
 }
 
-// ── Photo upload helpers ────────────────────────────────────────────────────
+function parseAnswerSegments(content) {
+  const segments = content.split(/\.\s+(?=[A-Za-z])/).map(s => s.trim().replace(/\.$/, '')).filter(Boolean);
+  return segments.map(seg => {
+    const colonIdx = seg.indexOf(':');
+    if (colonIdx === -1) return { key: '', value: seg, type: 'text' };
+    const key = seg.slice(0, colonIdx).trim();
+    const value = seg.slice(colonIdx + 1).trim();
+    const starMatch = value.match(/^(\d)\s*stars?\b\s*(?:\(([^)]*)\))?/i);
+    if (starMatch) {
+      return { key, type: 'stars', stars: parseInt(starMatch[1]), label: starMatch[2] || '' };
+    }
+    if (/^₹?[\d,]+(\.\d+)?$/.test(value)) {
+      return { key, type: 'number', value };
+    }
+    return { key, type: 'choice', value };
+  });
+}
+
+function prettyKey(key) {
+  const k = key.trim();
+  if (!k) return '';
+  return k.charAt(0).toUpperCase() + k.slice(1);
+}
+
+function renderHistoryAnswerRound(content, roundNum) {
+  const round = document.createElement('div');
+  round.className = 'session-round';
+  const fields = parseAnswerSegments(content);
+  round.innerHTML = `
+    <div class="session-round-eyebrow"><i class="ti ti-check"></i> Answers — round ${roundNum}</div>
+    ${fields.map(f => {
+      if (f.type === 'stars') {
+        return `<div class="fq-card readonly">
+          <div class="fq-question">${escapeHtml(prettyKey(f.key))}</div>
+          <div class="star-row">
+            ${[1,2,3,4,5].map(n => `<span class="star${n <= f.stars ? ' lit' : ''}">★</span>`).join('')}
+          </div>
+          ${f.label ? `<div class="star-label">${escapeHtml(f.label)}</div>` : ''}
+        </div>`;
+      }
+      if (f.type === 'number') {
+        return `<div class="fq-card readonly">
+          <div class="ro-key">${escapeHtml(prettyKey(f.key))}</div>
+          <div class="ro-value">₹${f.value.replace(/^₹/, '')}</div>
+        </div>`;
+      }
+      if (f.type === 'choice' && f.key) {
+        return `<div class="fq-card readonly">
+          <div class="ro-key">${escapeHtml(prettyKey(f.key))}</div>
+          <div class="choice-opt selected" style="cursor:default">${escapeHtml(f.value)}</div>
+        </div>`;
+      }
+      return `<div class="fq-card readonly"><div class="ro-value">${escapeHtml(f.value)}</div></div>`;
+    }).join('')}
+  `;
+  return round;
+}
+
+function renderHistoryDescriptionCard(content) {
+  const d = document.createElement('div');
+  d.className = 'session-desc-card';
+  d.innerHTML = `<i class="ti ti-quote"></i>${escapeHtml(content)}`;
+  return d;
+}
+
+function renderHistoryAssistantCard(content) {
+  const d = document.createElement('div');
+  d.className = 'card session-analysis-card';
+  const floorMatch = content.match(/floor price\s*₹?\s*([\d,]+)/i);
+  const bolded = escapeHtml(content).replace(/₹\s?[\d,]+/g, m => `<strong>${m}</strong>`);
+  d.innerHTML = `
+    ${floorMatch ? `<div class="session-floor-chip"><span>Floor price</span> ₹${floorMatch[1]}</div>` : ''}
+    <div class="session-analysis-text">${bolded}</div>`;
+  return d;
+}
+function closeSessionView() { document.getElementById('topbar-session').textContent = ''; resetFlow(); }
+
+/* ── Reset / landing / mode selection ───────────────────────────────────── */
+function resetFlow() {
+  sessionId = null; qRound = 0;
+  if (recording) toggleRecording();
+  document.getElementById('desc-inp').value = '';
+  autosize(document.getElementById('desc-inp'));
+  document.getElementById('input-error').textContent = '';
+  removePhoto();
+  document.getElementById('qa-container').innerHTML = '';
+  document.getElementById('results-block').innerHTML = '';
+  document.getElementById('refine-box').style.display = 'none';
+  document.getElementById('topbar-session').textContent = '';
+  showView('landing');
+}
+
+function chooseMode(m) {
+  mode = m;
+  showView('input');
+  document.getElementById('input-type-block').classList.toggle('hidden', m !== 'type');
+  document.getElementById('input-speak-block').classList.toggle('hidden', m !== 'speak');
+  document.getElementById('mic-stage').classList.toggle('hidden', m !== 'speak');
+  document.getElementById('mode-switch-link').textContent = m === 'type' ? 'Prefer to speak instead?' : "Prefer to type instead?";
+  if (m === 'type') { setTimeout(() => document.getElementById('desc-inp').focus(), 50); }
+}
+function switchMode() { chooseMode(mode === 'type' ? 'speak' : 'type'); }
+function backToLanding() { showView('landing'); }
+
+function autosize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 260) + "px"; }
+
+/* ── Voice input (Web Speech API) ───────────────────────────────────────── */
+let recognition = null;
+let recording = false;
+let recBaseText = "";
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+
+function initMicSupport() {
+  const micBtn = document.getElementById("mic-btn");
+  const micStatus = document.getElementById("mic-status");
+  if (!SpeechRecognitionCtor) {
+    micBtn.classList.add("unsupported");
+    micBtn.title = "Voice input isn't supported in this browser";
+    micStatus.textContent = "Voice input isn't supported here — please type instead";
+  }
+}
+
+function toggleRecording() {
+  if (!SpeechRecognitionCtor) return;
+  const micBtn = document.getElementById("mic-btn");
+  const micIcon = document.getElementById("mic-icon");
+  const micStatus = document.getElementById("mic-status");
+  const ta = document.getElementById("desc-inp");
+
+  if (!recording) {
+    recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-IN";
+    recBaseText = ta.value.trim() ? ta.value.trim() + " " : "";
+
+    recognition.onresult = (e) => {
+      let interim = "", final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t + " ";
+        else interim += t;
+      }
+      if (final) recBaseText += final;
+      ta.value = (recBaseText + interim).trim();
+      autosize(ta);
+    };
+    recognition.onerror = () => {
+      recording = false;
+      micBtn.classList.remove("recording");
+      micIcon.className = "ti ti-microphone";
+      micStatus.textContent = "Couldn't hear you — tap to try again";
+      micStatus.classList.remove("live");
+    };
+    recognition.onend = () => {
+      if (recording) {
+        recording = false;
+        micBtn.classList.remove("recording");
+        micIcon.className = "ti ti-microphone";
+        micStatus.textContent = "Tap to start speaking";
+        micStatus.classList.remove("live");
+      }
+    };
+    try {
+      recognition.start();
+      recording = true;
+      micBtn.classList.add("recording");
+      micIcon.className = "ti ti-player-stop-filled";
+      micStatus.textContent = "Listening… tap to stop";
+      micStatus.classList.add("live");
+    } catch (e) { recording = false; }
+  } else {
+    recording = false;
+    recognition.stop();
+    micBtn.classList.remove("recording");
+    micIcon.className = "ti ti-microphone";
+    micStatus.textContent = "Tap to start speaking";
+    micStatus.classList.remove("live");
+  }
+}
+initMicSupport();
+
+/* ── Photo upload ────────────────────────────────────────────────────────── */
 window._photoFile = null;
-
 function removePhoto() {
   window._photoFile = null;
-  document.getElementById("photo-input").value = "";
+  const input = document.getElementById("photo-input");
+  if (input) input.value = "";
   document.getElementById("photo-preview-row").classList.remove("active");
-  document.getElementById("photo-drop").style.display = "";
 }
-
 (function initPhotoUpload() {
   const input = document.getElementById("photo-input");
-  const drop  = document.getElementById("photo-drop");
-  if (!input || !drop) return;
-
+  if (!input) return;
   function handleFile(file) {
     if (!file || !file.type.startsWith("image/")) return;
     window._photoFile = file;
@@ -530,265 +619,259 @@ function removePhoto() {
     reader.onload = e => {
       document.getElementById("photo-preview-img").src = e.target.result;
       document.getElementById("photo-preview-row").classList.add("active");
-      drop.style.display = "none";
     };
     reader.readAsDataURL(file);
   }
-
   input.addEventListener("change", e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
-  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
-  drop.addEventListener("drop", e => {
-    e.preventDefault(); drop.classList.remove("drag");
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-  });
 })();
 
-function handleKey(e) {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+/* ── Loading messages ────────────────────────────────────────────────────── */
+let loadingTimer = null;
+const LOADING_MESSAGES = ["Reading what you told me…","Looking up market prices…","Working out your costs…","Putting together your pricing…"];
+function startLoadingMessages() {
+  let i = 0;
+  document.getElementById('loading-text').textContent = LOADING_MESSAGES[0];
+  loadingTimer = setInterval(() => {
+    i = (i + 1) % LOADING_MESSAGES.length;
+    document.getElementById('loading-text').textContent = LOADING_MESSAGES[i];
+  }, 1600);
+}
+function setLoadingText(t) { document.getElementById('loading-text').textContent = t; }
+function stopLoadingMessages() { if (loadingTimer) clearInterval(loadingTimer); loadingTimer = null; }
+
+/* ── Submit initial description ─────────────────────────────────────────── */
+async function submitDescription() {
+  if (busy) return;
+  const ta = document.getElementById('desc-inp');
+  const text = ta.value.trim();
+  const errEl = document.getElementById('input-error');
+  if (!text) { errEl.textContent = "Tell me a little about your product first — speak or type."; return; }
+  errEl.textContent = '';
+  if (recording) toggleRecording();
+
+  busy = true;
+  document.getElementById('submit-btn').disabled = true;
+  showView('loading');
+  startLoadingMessages();
+
+  let imageQualityNote = "", imageQualityStars = null;
+  const photoFile = window._photoFile;
+  if (photoFile) {
+    setLoadingText('Reading your photo…');
+    try {
+      const fd = new FormData();
+      fd.append("image", photoFile);
+      const r = await fetch(API + "/price-image-analyze", { method: "POST", body: fd });
+      if (r.ok) {
+        const img = await r.json();
+        const stars = img.work_quality_stars || 3;
+        const reason = img.work_quality_reason || "";
+        const details = [...(img.product_details || []), ...(img.material_hints || [])].join(", ");
+        imageQualityNote = `Work quality from photo: ${stars} stars (${reason}).${details ? " Visible details: " + details + "." : ""}`;
+        imageQualityStars = stars;
+      }
+    } catch (e) {}
+  }
+  setLoadingText('Working out your price…');
+  const prompt = imageQualityNote ? `${text} ${imageQualityNote}` : text;
+
+  try {
+    const r = await fetch(API + "/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: prompt, session_id: null, image_quality_stars: imageQualityStars })
+    });
+    stopLoadingMessages();
+    if (!r.ok) {
+      const err = await r.json();
+      showView('input');
+      errEl.textContent = err.detail || "Something went wrong. Try again.";
+    } else {
+      const data = await r.json();
+      sessionId = data.session_id;
+      document.getElementById('topbar-session').textContent = data.product_type || 'Analysis';
+      qRound = 0;
+      document.getElementById('qa-container').innerHTML = '';
+      document.getElementById('results-block').innerHTML = '';
+      showView('flow');
+      if (data.follow_up_questions && data.follow_up_questions.length) {
+        renderFollowUpQuestions(data.follow_up_questions);
+      } else {
+        document.getElementById('refine-box').style.display = 'flex';
+      }
+      renderResultsBlock(data);
+      loadSessions();
+      scrollToLatestRound();
+    }
+  } catch (e) {
+    stopLoadingMessages();
+    showView('input');
+    errEl.textContent = "Cannot reach the backend. Make sure the API is running.";
+  }
+  busy = false;
+  document.getElementById('submit-btn').disabled = false;
 }
 
-// ── Chat message rendering ────────────────────────────────────────────────────
-function addMsg(role, html) {
-  const msgs = document.getElementById("msgs");
-  const d = document.createElement("div");
-  d.className = "msg " + role;
-  const av = role === "assistant"
-    ? '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div>'
-    : '<div class="avatar">You</div>';
-  d.innerHTML = av + `<div class="bubble">${html}</div>`;
-  msgs.appendChild(d);
-  msgs.scrollTop = msgs.scrollHeight;
+function scrollToEl(el) { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function scrollToLatestRound() {
+  const rounds = document.querySelectorAll('#qa-container .round');
+  if (rounds.length) scrollToEl(rounds[rounds.length - 1]);
+  else scrollToEl(document.getElementById('results-block'));
 }
+function scrollToResults() { scrollToEl(document.getElementById('results-block')); }
 
-function showTyping() {
-  const msgs = document.getElementById("msgs");
-  const d = document.createElement("div");
-  d.id = "typing"; d.className = "msg assistant";
-  d.innerHTML = '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div><div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>';
-  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
-}
-
-function removeTyping() { const t = document.getElementById("typing"); if (t) t.remove(); }
-
-// ── Follow-up question card rendering ────────────────────────────────────────
-// Store on window so inline oninput handlers can always reach it
+/* ── Follow-up question cards (stacked, not chat bubbles) ─────────────────── */
 window._fqAnswers = {};
+window._fqFieldMap = {};
+window._fqStarLabels = {};
 
 function renderFollowUpQuestions(questions) {
   if (!questions || !questions.length) return;
-  // Fresh object for this question set
+  qRound += 1;
+  const roundId = 'r' + qRound;
   window._fqAnswers = {};
+  window._fqFieldMap = {};
   window._fqStarLabels = {};
 
-  const msgs = document.getElementById("msgs");
-  const wrapper = document.createElement("div");
-  wrapper.className = "msg assistant";
-  wrapper.innerHTML = '<div class="avatar"><i class="ti ti-robot" style="font-size:14px"></i></div>';
+  const round = document.createElement('div');
+  round.className = 'round';
+  round.id = roundId;
 
-  const cardWrap = document.createElement("div");
-  cardWrap.style.cssText = "display:flex;flex-direction:column;gap:10px;max-width:85%";
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'round-eyebrow';
+  eyebrow.textContent = qRound === 1 ? 'A few quick questions' : 'Just a couple more things';
+  round.appendChild(eyebrow);
 
   questions.forEach(q => {
-    const card = document.createElement("div");
-    card.className = "fq-card";
-    const uid = q.field; // field name is always unique per question set
+    const uid = `${roundId}_${q.field}`;
+    window._fqFieldMap[uid] = q.field;
+    const card = document.createElement('div');
+    card.className = 'fq-card';
 
     if (q.type === "stars" && (q.field === "packaging_quality" || q.field === "marketplace_platform")) {
       const labels = q.star_labels && q.star_labels.length ? q.star_labels : getStarLabels(q.field, []);
       card.innerHTML = `
-        <div>
-          <div class="fq-question">${q.question}</div>
-          <div class="fq-sub">Select one option</div>
-        </div>
+        <div><div class="fq-question">${q.question}</div><div class="fq-sub">Select one option</div></div>
         <div class="choice-grid" id="choice-${uid}">
           ${labels.map((label, i) => `
-            <div class="choice-opt" data-field="${uid}" data-val="${i+1}" onclick="setChoice('${uid}', ${i+1}, this)">
-              <span class="choice-num">${i+1}</span>
-              ${label}
+            <div class="choice-opt" data-val="${i+1}" onclick="setChoice('${uid}', ${i+1}, this)">
+              <span class="choice-num">${i+1}</span>${label}
             </div>`).join("")}
         </div>`;
-
     } else if (q.type === "choice" && q.options && q.options.length) {
       card.innerHTML = `
-        <div>
-          <div class="fq-question">${q.question}</div>
-          <div class="fq-sub">Select one option</div>
-        </div>
+        <div><div class="fq-question">${q.question}</div><div class="fq-sub">Select one option</div></div>
         <div class="choice-grid" id="choice-${uid}">
           ${q.options.map(label => `
-            <div class="choice-opt" data-uid="${uid}" data-val="${label.replace(/"/g,'&quot;')}" onclick="setChoiceText(this)">
-              ${label}
-            </div>`).join("")}
+            <div class="choice-opt" data-val="${label.replace(/"/g,'&quot;')}" onclick="setChoiceText('${uid}', this)">${label}</div>`).join("")}
         </div>`;
-
     } else if (q.type === "text") {
       card.innerHTML = `
-        <div>
-          <div class="fq-question">${q.question}</div>
-        </div>
-        <input class="num-input" type="text" style="max-width:100%;font-size:14px;"
-               placeholder="Type your answer…"
-               oninput="setTextAnswer('${uid}', this.value)"/>`;
-
+        <div><div class="fq-question">${q.question}</div></div>
+        <input class="num-input text-style" type="text" placeholder="Type your answer…" oninput="setTextAnswer('${uid}', this.value)"/>`;
     } else if (q.type === "stars") {
       const labels = q.star_labels && q.star_labels.length ? q.star_labels : getStarLabels(q.field, []);
-      // Store labels in a JS map keyed by uid so onclick doesn't need to pass them inline
-      window._fqStarLabels = window._fqStarLabels || {};
       window._fqStarLabels[uid] = labels;
       card.innerHTML = `
-        <div>
-          <div class="fq-question">${q.question}</div>
-          <div class="fq-sub">Tap to rate</div>
-        </div>
+        <div><div class="fq-question">${q.question}</div><div class="fq-sub">Tap to rate</div></div>
         <div>
           <div class="star-row" id="stars-${uid}">
-            ${[1,2,3,4,5].map(n =>
-              `<span class="star" data-n="${n}" data-uid="${uid}" onclick="setStar('${uid}',${n})">★</span>`
-            ).join("")}
+            ${[1,2,3,4,5].map(n => `<span class="star" data-n="${n}" onclick="setStar('${uid}',${n})">★</span>`).join("")}
           </div>
           <div class="star-label" id="star-label-${uid}">—</div>
         </div>`;
     } else {
       card.innerHTML = `
-        <div>
-          <div class="fq-question">${q.question}</div>
-          <div class="fq-sub">Enter the value below</div>
-        </div>
+        <div><div class="fq-question">${q.question}</div><div class="fq-sub">Enter the value below</div></div>
         <div class="num-row">
-          <input class="num-input" type="number" min="0" placeholder="0"
-                 oninput="setNum('${uid}', this.value)"/>
+          <input class="num-input" type="number" min="0" placeholder="0" oninput="setNum('${uid}', this.value)"/>
           ${q.unit ? `<span class="num-unit">${q.unit}</span>` : ''}
         </div>`;
     }
-    cardWrap.appendChild(card);
+    round.appendChild(card);
   });
 
-  const submitBtn = document.createElement("button");
-  submitBtn.className = "fq-submit";
-  submitBtn.textContent = "Update pricing ↑";
-  submitBtn.onclick = () => submitAnswers(submitBtn);
-  cardWrap.appendChild(submitBtn);
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'fq-submit';
+  submitBtn.textContent = 'Update pricing ↑';
+  submitBtn.onclick = () => submitAnswers(submitBtn, round);
+  round.appendChild(submitBtn);
 
-  wrapper.appendChild(cardWrap);
-  msgs.appendChild(wrapper);
-  msgs.scrollTop = msgs.scrollHeight;
+  document.getElementById('qa-container').appendChild(round);
 }
 
 function setStar(uid, val) {
   window._fqAnswers[uid] = val;
-  document.querySelectorAll(`#stars-${uid} .star`).forEach(s => {
-    s.classList.toggle("lit", parseInt(s.dataset.n) <= val);
-  });
-  const labels = (window._fqStarLabels || {})[uid] || [];
+  document.querySelectorAll(`#stars-${uid} .star`).forEach(s => s.classList.toggle('lit', parseInt(s.dataset.n) <= val));
+  const labels = window._fqStarLabels[uid] || [];
   const labelEl = document.getElementById(`star-label-${uid}`);
   if (labelEl) labelEl.textContent = labels[val-1] || `${val} star${val > 1 ? 's' : ''}`;
 }
-
 function setChoice(uid, val, el) {
   window._fqAnswers[uid] = val;
-  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => {
-    opt.classList.toggle("selected", opt === el);
-  });
+  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => opt.classList.toggle('selected', opt === el));
 }
-
-function setChoiceText(el) {
-  const uid = el.dataset.uid;
-  const val = el.dataset.val;
-  window._fqAnswers[uid] = val;
-  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => {
-    opt.classList.toggle("selected", opt === el);
-  });
+function setChoiceText(uid, el) {
+  window._fqAnswers[uid] = el.dataset.val;
+  document.querySelectorAll(`#choice-${uid} .choice-opt`).forEach(opt => opt.classList.toggle('selected', opt === el));
 }
+function setTextAnswer(uid, val) { window._fqAnswers[uid] = val.trim() || null; }
+function setNum(uid, val) { const num = parseFloat(val); window._fqAnswers[uid] = isNaN(num) ? null : num; }
 
-function setTextAnswer(uid, val) {
-  window._fqAnswers[uid] = val.trim() || null;
-}
-
-function setNum(uid, val) {
-  const num = parseFloat(val);
-  window._fqAnswers[uid] = isNaN(num) ? null : num;
-  console.log("setNum", uid, num, window._fqAnswers);
-}
-
-async function submitAnswers(btn) {
-  const answers = window._fqAnswers;
-  console.log("submitAnswers", answers);
-
-  // Validate at least one answer filled in
-  const filled = Object.entries(answers).filter(([,v]) => v !== null && v !== undefined && v !== "");
+async function submitAnswers(btn, roundEl) {
+  const raw = window._fqAnswers;
+  const filled = Object.entries(raw).filter(([,v]) => v !== null && v !== undefined && v !== "");
   if (!filled.length) { btn.textContent = "Please answer at least one question"; return; }
+
+  const payload = {};
+  filled.forEach(([uid, v]) => { payload[window._fqFieldMap[uid] || uid] = v; });
 
   btn.disabled = true;
   btn.textContent = "Updating…";
   busy = true;
-  document.getElementById("sbtn").disabled = true;
-
-  // Build human-readable summary and show it immediately in chat
-  const summary = filled.map(([k, v]) => {
-    const STAR_LABELS_LOCAL = {
-      packaging_quality: ["No packaging","Basic poly bag","Kraft/simple box","Gift box with tissue","Premium branded box"],
-      work_quality: ["Learning/practice","Decent, minor flaws","Good, market standard","Polished, professional","Expert, gallery quality"],
-      experience_level: ["Just started <1yr","Some experience 1-2yr","Intermediate 2-4yr","Experienced 4-8yr","Expert 8+yr"],
-      uniqueness: ["Very common design","Slight variation","Some unique elements","Distinctive, rare","One-of-a-kind"],
-      marketplace_platform: ["Selling offline/local","Instagram/WhatsApp direct","Meesho/Flipkart","Etsy/Amazon","Own website/boutique"],
-    };
-    const labels = STAR_LABELS_LOCAL[k];
-    if (labels && typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 5) {
-      return `${k.replace(/_/g," ")}: ${v}★ — ${labels[v-1]}`;
-    }
-    return `${k.replace(/_/g," ")}: ${v}`;
-  }).join("\n");
-
-  // Show in chat right away — don't wait for backend
-  addMsg("user", summary.replace(/\n/g, "<br>"));
-  showTyping();
 
   try {
     const r = await fetch(API + "/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: "",
-        session_id: sessionId,
-        question_answers: answers,
-        user_summary: summary  // sent to backend for DB storage
-      })
+      body: JSON.stringify({ message: "", session_id: sessionId, question_answers: payload })
     });
-
-    removeTyping();
-
     if (!r.ok) {
       const err = await r.json();
-      addMsg("assistant", `Error: ${err.detail || "Something went wrong."}`);
+      btn.textContent = "Couldn't update — try again";
+      btn.disabled = false;
     } else {
       const data = await r.json();
       sessionId = data.session_id;
-      addMsg("assistant", data.reply);
-      if (data.type === "reanalysis" && data.data) {
-        renderPanel(data.data);
-      }
-      // Ask follow-up questions if still needed
+      roundEl.classList.add('round-disabled');
+      const tag = document.createElement('div');
+      tag.className = 'round-answered-tag';
+      tag.innerHTML = '<i class="ti ti-check"></i> Answered';
+      roundEl.appendChild(tag);
+
+      if (data.type === "reanalysis" && data.data) renderResultsBlock(data.data);
+
       const next = data.follow_up_questions || [];
       if (next.length) {
         renderFollowUpQuestions(next);
+        scrollToLatestRound();
+      } else {
+        document.getElementById('refine-box').style.display = 'flex';
+        scrollToResults();
       }
     }
-  } catch(e) {
-    removeTyping();
-    addMsg("assistant", "Could not reach backend.");
+  } catch (e) {
+    btn.textContent = "Couldn't reach backend — try again";
+    btn.disabled = false;
   }
-
   busy = false;
-  document.getElementById("sbtn").disabled = false;
 }
 
-// ── Panel rendering ───────────────────────────────────────────────────────────
-function renderPanel(d) {
+/* ── Results rendering ──────────────────────────────────────────────────── */
+function renderResultsBlock(d) {
   const market = d.market || {};
   const costs = d.costs || {};
 
-  // Cost breakdown
   const costItems = [
     ["Materials", costs.materials],
     ["Labor", costs.labor],
@@ -797,89 +880,59 @@ function renderPanel(d) {
     ["Marketplace fee (8%)", costs.marketplace_fee],
     ["Waste allowance (10%)", costs.waste_allowance],
   ];
-  let costHtml = costItems
-    .filter(([,v]) => v != null)
-    .map(([k,v,note]) => `
-      <div class="brow">
-        <span>${k}${note ? ` <span style="font-size:10px;color:#aaa">(${note})</span>` : ''}</span>
-        <span class="val">₹${v}</span>
-      </div>`).join("");
+  let costHtml = costItems.filter(([,v]) => v != null).map(([k,v,note]) => `
+      <div class="brow"><span>${k}${note ? ` <span style="font-size:10px;color:#c2b9ab">(${note})</span>` : ''}</span><span class="val">₹${v}</span></div>`).join("");
   costHtml += `<div class="brow total"><span>Floor price</span><span class="val">₹${d.floor_price}</span></div>`;
   if (d.user_planned_price) {
     const diff = d.user_planned_price - d.floor_price;
-    costHtml += `<div class="brow ${diff < 0 ? 'loss' : 'profit'}">
-      <span>Your planned price</span>
-      <span class="val">₹${d.user_planned_price} (${diff < 0 ? '−₹'+Math.abs(diff)+' loss' : '+₹'+diff})</span>
-    </div>`;
+    costHtml += `<div class="brow ${diff < 0 ? 'loss' : 'profit'}"><span>Your planned price</span><span class="val">₹${d.user_planned_price} (${diff < 0 ? '−₹'+Math.abs(diff)+' loss' : '+₹'+diff})</span></div>`;
   }
 
-  // Tiers
   const tierValues = Object.values(d.tiers || {});
   const tiersHtml = tierValues.map((t, i) => `
     <div class="tier${i===1?' rec':''}">
-      <div class="tier-left">
-        <div class="tier-label">${t.label}${i===1?' <span class="tier-badge">Recommended</span>':''}</div>
-        <div class="tier-note">${t.note}</div>
-      </div>
+      <div class="tier-left"><div class="tier-label">${t.label}${i===1?' <span class="tier-badge">Recommended</span>':''}</div><div class="tier-note">${t.note}</div></div>
       <div class="tier-price">₹${t.price}</div>
     </div>`).join("");
 
-  // Market card
   const hasMarketPrices = market.market_min != null;
   const maxV = market.market_max || 1;
   const std = tierValues[1]?.price || 0;
   let mktHtml = "";
   if (hasMarketPrices) {
     const bars = [["Min",market.market_min,"#9fe1cb"],["Avg",market.market_avg,"#1d9e75"],["Max",market.market_max,"#085041"]];
-    mktHtml += bars.map(([l,v,c]) =>
-      `<div class="mbar-row"><div class="mbar-label">${l}</div><div class="mbar-track"><div class="mbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${c}"></div></div><div class="mbar-val">₹${v}</div></div>`
-    ).join("");
+    mktHtml += bars.map(([l,v,c]) => `<div class="mbar-row"><div class="mbar-label">${l}</div><div class="mbar-track"><div class="mbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${c}"></div></div><div class="mbar-val">₹${v}</div></div>`).join("");
     const pos = std < market.market_min ? `₹${std} is below market min — you can charge more`
       : std < market.market_avg ? `₹${std} is below market average — good value positioning`
       : std <= market.market_max ? `₹${std} is in the mid-to-premium range`
       : `₹${std} is above market max — justify with quality`;
     mktHtml += `<div class="your-pos"><div class="your-dot"></div><span>${pos}</span></div>`;
   } else {
-    mktHtml += `<div style="font-size:12px;color:#aaa;font-style:italic">No prices found — DuckDuckGo may have rate-limited. Cached for 6hrs.</div>`;
+    mktHtml += `<div style="font-size:12px;color:#c2b9ab;font-style:italic">No prices found — try again shortly.</div>`;
   }
   const sources = market.sources || [];
   const fromCache = market.from_cache ? " (cached)" : "";
-  mktHtml += `<div style="margin-top:10px;padding-top:8px;border-top:0.5px solid #f0f0f0">
-    <div style="font-size:11px;color:#888;margin-bottom:5px">
-      <i class="ti ti-database" style="font-size:12px"></i>
-      Scraped <strong>${market.sample_count||0}</strong> prices from <strong>${sources.length}</strong> sites${fromCache}
-    </div>
-    ${sources.length ? sources.slice(0,5).map(s => {
-      let host = s; try { host = new URL(s).hostname.replace("www.",""); } catch(e) {}
-      return `<a class="source-link" href="${s}" target="_blank" rel="noopener">↗ ${host}</a>`;
-    }).join("") : '<span style="font-size:11px;color:#ccc">No sources</span>'}
+  mktHtml += `<div style="margin-top:11px;padding-top:9px;border-top:0.5px solid #f4f0ea">
+    <div style="font-size:11px;color:#a39a8c;margin-bottom:6px"><i class="ti ti-database" style="font-size:12px"></i> Scraped <strong>${market.sample_count||0}</strong> prices from <strong>${sources.length}</strong> sites${fromCache}</div>
+    ${sources.length ? sources.slice(0,5).map(s => { let host = s; try { host = new URL(s).hostname.replace("www.",""); } catch(e) {} return `<a class="source-link" href="${s}" target="_blank" rel="noopener">↗ ${host}</a>`; }).join("") : '<span style="font-size:11px;color:#d8d0c3">No sources</span>'}
   </div>`;
 
-  // Confidence
   const conf = Math.round((d.confidence||0.5) * 100);
   const confColor = conf >= 75 ? "#1d9e75" : conf >= 55 ? "#ba7517" : "#e24b4a";
 
-  // Missing info
   const missingHtml = (d.missing_info||[]).length
     ? `<div class="card"><div class="card-title"><i class="ti ti-info-circle" style="color:#ba7517"></i> To improve accuracy</div><div class="missing">${d.missing_info.map(m=>`<div class="missing-item"><i class="ti ti-point" style="color:#ba7517"></i>${m}</div>`).join("")}</div></div>`
     : "";
 
-  // RAG
   const ragProducts = d.retrieved_products || [];
   const ragHtml = ragProducts.length ? `
-    <div class="card">
-      <div class="card-title"><i class="ti ti-books"></i> Similar products used for pricing</div>
-      ${ragProducts.slice(0,3).map(p => `
-        <div class="brow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0">
-          <span style="font-size:12px;color:#111">${p.description}</span>
-          <span style="font-size:11px;color:#888">₹${p.selling_price} · ${p.complexity} · similarity ${Math.round(p.similarity_score*100)}%</span>
-        </div>`).join("")}
+    <div class="card"><div class="card-title"><i class="ti ti-books"></i> Similar products used for pricing</div>
+      ${ragProducts.slice(0,3).map(p => `<div class="brow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0"><span style="font-size:12.5px;color:var(--ink)">${p.description}</span><span style="font-size:11.5px;color:var(--ink-soft)">₹${p.selling_price} · ${p.complexity} · similarity ${Math.round(p.similarity_score*100)}%</span></div>`).join("")}
     </div>` : "";
 
-  document.getElementById("panel-empty").classList.add("hidden");
-  const pc = document.getElementById("panel-cards");
-  pc.classList.remove("hidden");
-  pc.innerHTML = `
+  const block = document.getElementById('results-block');
+  block.innerHTML = `
+    <div class="results-heading"><i class="ti ti-sparkles"></i> Your price breakdown</div>
     <div class="card"><div class="card-title"><i class="ti ti-calculator"></i> Cost breakdown</div>${costHtml}</div>
     <div class="card"><div class="card-title"><i class="ti ti-layers"></i> Pricing tiers</div><div class="tiers">${tiersHtml}</div></div>
     <div class="card"><div class="card-title"><i class="ti ti-chart-bar"></i> Market research</div>${mktHtml}</div>
@@ -888,75 +941,42 @@ function renderPanel(d) {
       <div class="conf-text">${conf}% — ${d.labor_reasoning||""}</div>
     </div>
     ${missingHtml}${ragHtml}`;
+  // Keep results (and the refine box below it) pinned at the bottom of the flow,
+  // after the latest round of questions.
+  const flow = document.getElementById('view-flow');
+  flow.appendChild(block);
+  flow.appendChild(document.getElementById('refine-box'));
 }
 
-// ── Main send ─────────────────────────────────────────────────────────────────
-async function send() {
-  if (busy) return;
-  const inp = document.getElementById("inp");
-  const text = inp.value.trim();
-  if (!text) return;
+/* ── Free-form refine box (after questions are done) ───────────────────── */
+function handleRefineKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitRefine(); } }
 
+async function submitRefine() {
+  if (busy) return;
+  const ta = document.getElementById('refine-inp');
+  const text = ta.value.trim();
+  if (!text) return;
   busy = true;
-  document.getElementById("sbtn").disabled = true;
-  document.getElementById("pills").classList.add("hidden");
-  inp.value = ""; inp.style.height = "auto";
-  addMsg("user", text);
-  showTyping();
+  document.getElementById('refine-send').disabled = true;
+  ta.value = ''; ta.style.height = 'auto';
 
   try {
-    const isFollowUp = sessionId !== null;
-    const endpoint = isFollowUp ? "/chat" : "/analyze";
-    const body = isFollowUp
-      ? { message: text, session_id: sessionId }
-      : { description: text, session_id: sessionId };
-
-    const r = await fetch(API + endpoint, {
+    const r = await fetch(API + "/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ message: text, session_id: sessionId })
     });
-
-    removeTyping();
-
-    if (!r.ok) {
-      const err = await r.json();
-      addMsg("assistant", `Error: ${err.detail || "Something went wrong."}`);
-    } else {
+    if (r.ok) {
       const data = await r.json();
       sessionId = data.session_id;
-
-      if (endpoint === "/analyze") {
-        document.getElementById("chat-title").textContent = data.product_type || "Analysis";
-        addMsg("assistant", data.chat_reply);
-        renderPanel(data);
-        loadSessions();
-        // Render follow-up questions if any
-        if (data.follow_up_questions && data.follow_up_questions.length) {
-          renderFollowUpQuestions(data.follow_up_questions);
-        }
-      } else {
-        let reply = data.reply || "";
-        if (reply.trim().startsWith("{")) {
-          try { const inner = JSON.parse(reply); reply = inner.chat_reply || reply; }
-          catch(e) { const m = reply.match(/"chat_reply"\s*:\s*"((?:[^"\\]|\\.)*)"/); if (m) reply = m[1]; }
-        }
-        addMsg("assistant", reply);
-        if (data.type === "reanalysis" && data.data) {
-          renderPanel(data.data);
-        }
-        if (data.follow_up_questions && data.follow_up_questions.length) {
-          renderFollowUpQuestions(data.follow_up_questions);
-        }
-      }
+      if (data.type === "reanalysis" && data.data) renderResultsBlock(data.data);
+      const next = data.follow_up_questions || [];
+      if (next.length) { renderFollowUpQuestions(next); scrollToLatestRound(); }
+      else scrollToResults();
     }
-  } catch(e) {
-    removeTyping();
-    addMsg("assistant", "Cannot reach the backend. Make sure FastAPI is running on port 8080.");
-  }
-
+  } catch (e) {}
   busy = false;
-  document.getElementById("sbtn").disabled = false;
+  document.getElementById('refine-send').disabled = false;
 }
 
 checkHealth();
