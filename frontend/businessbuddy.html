@@ -66,11 +66,25 @@
   }
   .btn-primary{ background:var(--sage); color:#fff; }
   .btn-primary:hover{ background:#5c6a4f; }
+  .btn-primary:disabled{ background:#b7bfae; cursor:not-allowed; }
   .btn-ghost{
     background:transparent; border:1px solid var(--line); color:var(--ink);
   }
   .btn-ghost:hover{ background:var(--sage-soft); }
   #imageInput{ display:none; }
+
+  .image-preview-row{
+    width:100%; display:none; align-items:center; gap:10px; margin-top:4px;
+  }
+  .image-preview-row img{
+    width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
+  }
+  .image-preview-row .name{ font-size:13px; color:var(--ink-soft); flex:1; }
+  .image-preview-row button{
+    padding:6px 10px; font-size:12px; border-radius:8px; border:1px solid var(--line);
+    background:transparent; cursor:pointer; color:var(--ink-soft);
+  }
+  .image-preview-row button:hover{ background:var(--rust-soft); color:var(--rust); border-color:var(--rust); }
 
   .stitch{
     border:none; border-top:2px dashed var(--line); margin:36px 0 24px;
@@ -134,6 +148,16 @@
   .summary-card{ grid-column: 1 / -1; }
   .summary-card p{ font-size:14px; line-height:1.6; margin:0; }
 
+  .identified-banner{
+    grid-column: 1 / -1;
+    background:var(--sage-soft); border:1px solid var(--sage);
+    border-radius:var(--radius); padding:14px 18px; font-size:13px; color:#3f4a37;
+    display:flex; align-items:center; gap:10px;
+  }
+  .identified-banner img{
+    width:36px; height:36px; object-fit:cover; border-radius:8px; flex-shrink:0;
+  }
+
   /* --- collapsible secondary cards --- */
   .more-label{
     font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.06em;
@@ -174,8 +198,14 @@
     <p class="sub">Type a product, or upload a photo — Business Buddy reads the market for you.</p>
     <input type="text" id="productInput" placeholder="e.g. hand-thrown ceramic mug" />
     <input type="file" id="imageInput" accept="image/*" />
-    <button class="btn btn-ghost" onclick="document.getElementById('imageInput').click()">Upload photo</button>
+    <button class="btn btn-ghost" id="uploadBtn" type="button">Upload photo</button>
     <button class="btn btn-primary" id="analyzeBtn">Analyze market</button>
+
+    <div class="image-preview-row" id="imagePreviewRow">
+      <img id="imagePreviewThumb" alt="Selected photo" />
+      <span class="name" id="imagePreviewName"></span>
+      <button type="button" id="clearImageBtn">Remove</button>
+    </div>
   </div>
 
   <hr class="stitch" />
@@ -202,14 +232,53 @@ const API_BASE =
   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:8080"
     : ""; // set this to your deployed backend URL, same as pricebuddy.html's API constant
+
 const analyzeBtn = document.getElementById("analyzeBtn");
+const uploadBtn = document.getElementById("uploadBtn");
 const productInput = document.getElementById("productInput");
 const imageInput = document.getElementById("imageInput");
 const emptyState = document.getElementById("emptyState");
 const loadingState = document.getElementById("loadingState");
 const results = document.getElementById("results");
 
-analyzeBtn.addEventListener("click", async () => {
+const imagePreviewRow = document.getElementById("imagePreviewRow");
+const imagePreviewThumb = document.getElementById("imagePreviewThumb");
+const imagePreviewName = document.getElementById("imagePreviewName");
+const clearImageBtn = document.getElementById("clearImageBtn");
+
+let selectedImageDataUrl = null;
+
+uploadBtn.addEventListener("click", () => imageInput.click());
+
+// This was the missing piece: nothing ever listened for a file being
+// picked, so selecting a photo looked like it did nothing. Now we show a
+// preview and immediately kick off analysis, matching "upload a photo —
+// Business Buddy reads the market for you".
+imageInput.addEventListener("change", () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    selectedImageDataUrl = e.target.result;
+    imagePreviewThumb.src = selectedImageDataUrl;
+    imagePreviewName.textContent = file.name;
+    imagePreviewRow.style.display = "flex";
+    productInput.value = ""; // photo and typed name are mutually exclusive inputs
+    runAnalysis();
+  };
+  reader.readAsDataURL(file);
+});
+
+clearImageBtn.addEventListener("click", () => {
+  imageInput.value = "";
+  selectedImageDataUrl = null;
+  imagePreviewRow.style.display = "none";
+});
+
+analyzeBtn.addEventListener("click", runAnalysis);
+
+async function runAnalysis(){
   const productName = productInput.value.trim();
   const imageFile = imageInput.files[0];
 
@@ -218,6 +287,7 @@ analyzeBtn.addEventListener("click", async () => {
     return;
   }
 
+  analyzeBtn.disabled = true;
   emptyState.style.display = "none";
   results.style.display = "none";
   loadingState.style.display = "grid";
@@ -251,8 +321,10 @@ analyzeBtn.addEventListener("click", async () => {
       <h3>Couldn't analyze that product</h3>
       <p>${String(err.message || err).slice(0, 200)}</p>
     `;
+  } finally {
+    analyzeBtn.disabled = false;
   }
-});
+}
 
 function asArray(val){
   if (Array.isArray(val)) return val;
@@ -287,10 +359,19 @@ function renderResults(data){
   results.style.display = "block";
 
   const bestSeason = asArray(data.best_selling_seasons)[0];
+  const identified = data.identified_from_image;
+
+  const identifiedBanner = identified ? `
+    <div class="identified-banner">
+      ${selectedImageDataUrl ? `<img src="${selectedImageDataUrl}" alt="" />` : ""}
+      <span>Identified from your photo as <b>${identified.product_name || "this product"}</b>${identified.materials ? ` — ${identified.materials}` : ""}</span>
+    </div>
+  ` : "";
 
   // The 3 cards shown right after analysis — 1-2 points each, nothing more.
   const primaryCards = `
     <div class="grid">
+      ${identifiedBanner}
       <div class="card">
         <p class="section-label">Market Snapshot</p>
         <div class="pill-row">
@@ -315,7 +396,6 @@ function renderResults(data){
       </div>
     </div>
   `;
-
   // Everything else — collapsed by default, one tap to expand.
   // Cards with no data from the model are skipped entirely instead of showing empty.
   const cards = [

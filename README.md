@@ -1,8 +1,9 @@
 # Artisan Buddy
 
-> AI-powered pricing and listing assistant for artisans.
+> AI-powered pricing, listing, and market insight assistant for artisans.
 
-Price Buddy helps artisans estimate fair selling prices using AI reasoning, semantic search, and real marketplace data. It also reviews product photos and provides actionable design feedback before products are listed for sale.
+Artisan Buddy helps artisans estimate fair selling prices using AI reasoning, semantic search, and real marketplace data. It reviews product photos and provides actionable design feedback, surfaces market and opportunity insights for new product ideas, and connects the whole workflow together before products are listed for sale.
+
 <p align="center">
   <img src="images/homepage.png" width="46%">
 </p>
@@ -19,13 +20,13 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 - Interactive chat for refining pricing recommendations and follow-up questions
 
 <p align="center">
-  <img src="images/chatprompt.png" width="46%">
+  <img src="images/pricebuddy.png" width="46%">
 </p>
-  
+
 <p align="center">
-  <img src="images/resultprice.png" width="90">
+  <img src="images/pricebreakdown.png" width="46%">
+  <img src="images/rating.png" width="46%">
 </p>
-  
 
 ---
 
@@ -42,6 +43,34 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 
 ---
 
+### Business Buddy
+
+- Market and opportunity insights for a product idea — from a typed description or a photo
+- Demand and competition snapshot, best-selling seasons, and crafting difficulty at a glance
+- Target audience and buying motivation breakdown
+- Similar products, business opportunities, risks, and marketing ideas, expandable on demand
+- Photo upload path uses the vision model to identify the product before running the analysis
+
+<p align="center">
+  <img src="images/business.png" width="65%">
+</p>
+
+---
+
+### Connect
+
+<p align="center">
+  <img src="images/connect.png" width="65%">
+</p>
+
+<!--
+  Note: add a line or two here describing what "Connect" does — I don't have
+  details on this feature beyond the screenshot filename, so I've left it as
+  a placeholder. Happy to write the description once you tell me what it covers.
+-->
+
+---
+
 ## Highlights
 
 - Built a custom Retrieval-Augmented Generation (RAG) pipeline from scratch.
@@ -51,6 +80,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
 - Uses Sentence Transformers and ChromaDB for semantic similarity search.
 - Combines retrieved marketplace examples with LLM reasoning to generate explainable, market-aware price recommendations.
 - Supports multimodal product evaluation through image analysis and design feedback.
+- Business Buddy extends the same vision pipeline to turn a product photo directly into market insights.
 
 ---
 
@@ -80,8 +110,8 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
      Sentence Transformers     Vision Model
                │                   │
                ▼                   ▼
-       ChromaDB Marketplace     Design Analysis
-            Retrieval                 │
+       ChromaDB Marketplace     Design Analysis /
+            Retrieval          Business Insights
                │                      │
                └──────────┬───────────┘
                           ▼
@@ -89,7 +119,7 @@ Price Buddy helps artisans estimate fair selling prices using AI reasoning, sema
                           │
                           ▼
       Price Recommendation + Market Comparison +
-             Product Feedback & Explanation
+        Product Feedback + Business Insights
 ```
 
 ---
@@ -128,6 +158,8 @@ API Docs → `http://localhost:8080/docs`
 | POST | `/market-research` | Marketplace comparison only |
 | POST | `/chat` | Continue an existing pricing session |
 | POST | `/design-analyze` | Product image analysis |
+| POST | `/business-buddy/analyze` | Market and opportunity insights from a product description |
+| POST | `/business-buddy/analyze-image` | Market and opportunity insights from a product photo |
 | POST | `/market-index/build` | Rebuild marketplace knowledge base |
 | GET | `/history` | Retrieve previous sessions |
 | GET | `/health` | Health check |

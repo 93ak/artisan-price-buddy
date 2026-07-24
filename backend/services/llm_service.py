@@ -1,10 +1,13 @@
 import os
 import json
 import re
+import base64
 import logging
+from io import BytesIO
 from typing import Optional
 from groq import AsyncGroq
 from dotenv import load_dotenv
+from PIL import Image, ImageOps
 
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
@@ -125,6 +128,20 @@ If user provides NEW cost info:
 
 Labor math: hours × rate. Always show both."""
 
+# ── Vision: product identification from a photo ──────────────────────────────
+# qwen/qwen3.6-27b (the same model used everywhere else in this file) is
+# vision-capable on Groq, so no separate model/service is needed. This is used
+# by Business Buddy's "analyze-image" flow to turn a photo into the
+# product_name/category/materials/style/keywords fields that
+# get_business_insights() expects.
+VISION_SYSTEM = """You are a product identification assistant for Indian artisans.
+Look at the photo and identify the handmade product. Reply ONLY with JSON, no other text, no markdown fences.
+
+Output exactly this JSON:
+{"product_name":"short descriptive name","category":"e.g. pottery, jewelry, textiles, woodwork","materials":"comma-separated materials you can see","style":"visual style/technique observed","keywords":"3-5 comma-separated search keywords for this product"}
+
+If you're unsure about a field, make your best reasonable guess from what's visible — never leave a field empty."""
+
 
 def build_system(rag_context: str = "", cross_session_context: str = "") -> str:
     rag = f"\n{rag_context}\n" if rag_context else ""
@@ -142,6 +159,83 @@ async def call_llm(messages: list, system: str) -> str:
         reasoning_format="hidden" # ← and hide/strip any reasoning it does produce from the output
     )
     return strip_think(response.choices[0].message.content)  # harmless no-op safety net now
+
+
+MAX_IMAGE_DIMENSION = 1600  # px on the longest side — plenty for identification, keeps payload well under Groq's 20MB limit
+
+
+def _normalize_image_bytes(image_bytes: bytes) -> bytes:
+    """
+    Re-encode any uploaded photo into clean, valid JPEG bytes before it goes
+    to Groq. This is what actually fixes "invalid image data" errors — the
+    original bytes/mime_type from the browser can't always be trusted:
+    - iPhone camera uploads are often HEIC, not JPEG/PNG
+    - phone photos frequently carry EXIF rotation that some decoders choke on
+    - occasional CMYK JPEGs or other odd color modes
+    - oversized camera photos (10+ MB) that are needlessly large for this use
+    Raises ValueError if the bytes genuinely aren't a readable image (e.g.
+    unsupported HEIC without the pillow-heif plugin installed, or a
+    corrupted/non-image file).
+    """
+    try:
+        img = Image.open(BytesIO(image_bytes))
+        img.load()
+    except Exception as e:
+        raise ValueError(
+            "Uploaded file isn't a readable image (if this is an iPhone photo, "
+            f"it may be in HEIC format — try a JPEG/PNG export instead): {e}"
+        )
+
+    # Respect EXIF orientation so sideways/upside-down phone photos come out right
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    if max(img.size) > MAX_IMAGE_DIMENSION:
+        img.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION))
+
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
+
+
+async def identify_product_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
+    """
+    Send a photo to the vision-capable Qwen model on Groq and get back
+    structured product identification: product_name, category, materials,
+    style, keywords. Raises ValueError if the image can't be read or the
+    response can't be parsed.
+    """
+    normalized_bytes = _normalize_image_bytes(image_bytes)
+    b64 = base64.b64encode(normalized_bytes).decode("utf-8")
+    data_url = f"data:image/jpeg;base64,{b64}"  # always JPEG now, regardless of original mime_type
+
+    response = await client.chat.completions.create(
+        model=MODEL,  # qwen/qwen3.6-27b — vision-capable
+        messages=[
+            {"role": "system", "content": VISION_SYSTEM},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Identify this handmade product."},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            },
+        ],
+        temperature=0.2,
+        max_tokens=500,
+        reasoning_effort="none",
+        reasoning_format="hidden",
+    )
+    raw = strip_think(response.choices[0].message.content)
+    parsed = extract_json(raw)
+    if not parsed:
+        raise ValueError(f"Could not parse vision response: {raw[:300]}")
+    return parsed
 
 
 def sanitize_json(raw: str) -> str:

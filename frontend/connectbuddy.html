@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Connect Buddy</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root{
+  --maroon:#7a1212; --maroon-dark:#5c0d0d; --cream:#f0ede8; --card-bg:#fff;
+  --line:#e8e2da; --line-soft:#efe9e1; --ink:#1c1a17; --ink-soft:#8a8378;
+  --blush:#fdf5f5; --blush-line:#e8c8c8; --green:#1d9e75;
+}
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--cream); min-height: 100vh; color: var(--ink); }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.topbar { position: sticky; top:0; z-index: 20; padding: 0.85rem 1.25rem; background: rgba(240,237,232,0.92); backdrop-filter: blur(8px); border-bottom: 0.5px solid var(--line); display:flex; align-items:center; gap:12px; min-height:56px; }
+.topbar-brand { display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; cursor:pointer; }
+.topbar-brand i { color: var(--maroon); }
+.topbar-back { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+.topbar-back:hover { color:var(--maroon); }
+.topbar-spacer { flex:1; }
+
+.main-scroll { max-width: 720px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+.view { display:none; flex-direction:column; gap:1.1rem; }
+.view.active { display:flex; }
+
+/* ── LANDING: square nav grid ────────────────────────────────────────── */
+#view-landing { padding-top: 1rem; }
+.landing-heading { font-size:22px; font-weight:800; margin-bottom:2px; }
+.landing-sub { font-size:13.5px; color:var(--ink-soft); margin-bottom:0.75rem; line-height:1.5; }
+.nav-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; }
+.nav-square { aspect-ratio: 1 / 1; background:#fff; border:1.5px solid var(--line); border-radius:18px; padding:1.2rem; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; transition:all .15s; text-align:left; }
+.nav-square:hover { border-color:var(--maroon); transform:translateY(-2px); box-shadow:0 10px 24px rgba(122,18,18,0.09); }
+.nav-square i.nav-icon { font-size:30px; color:var(--maroon); }
+.nav-square-label { font-size:15.5px; font-weight:800; color:var(--ink); }
+.nav-square-sub { font-size:12px; color:var(--ink-soft); line-height:1.4; margin-top:3px; }
+.nav-square.wide { grid-column: span 2; aspect-ratio:auto; flex-direction:row; align-items:center; gap:14px; padding:1.1rem 1.3rem; }
+.nav-square.wide .nav-square-text { display:flex; flex-direction:column; gap:2px; }
+.nav-square.wide i.nav-icon { font-size:26px; }
+
+/* ── Page heading (used on all sub-pages) ───────────────────────────── */
+.page-heading { font-size:19px; font-weight:800; }
+.page-sub { font-size:13px; color:var(--ink-soft); line-height:1.5; margin-top:2px; }
+
+/* ── Ask panel ───────────────────────────────────────────────────────── */
+.ask-box { background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:10px; }
+.ask-row { display:flex; gap:8px; align-items:flex-end; }
+.ask-row textarea { flex:1; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; font-family:inherit; font-size:14px; resize:none; min-height:44px; max-height:140px; outline:none; }
+.ask-row textarea:focus { border-color:var(--maroon); }
+.ask-send { width:44px; height:44px; border-radius:10px; border:none; background:var(--maroon); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.ask-send:disabled { opacity:.45; cursor:not-allowed; }
+.chip-row-label { font-size:11px; font-weight:700; color:#a39a8c; text-transform:uppercase; letter-spacing:.05em; }
+.ask-examples, .chip-row { display:flex; flex-wrap:wrap; gap:7px; }
+.ask-chip, .filter-chip { font-size:12px; color:var(--maroon); background:var(--blush); border:1px solid var(--blush-line); border-radius:100px; padding:7px 13px; cursor:pointer; font-weight:600; transition:all .12s; display:flex; align-items:center; gap:5px; }
+.ask-chip:hover, .filter-chip:hover { background:#fbeeee; }
+.filter-chip.active { background:var(--maroon); color:#fff; border-color:var(--maroon); }
+
+.ask-result-reason { font-size:13px; color:var(--ink-soft); font-style:italic; padding:0 2px; }
+.ask-empty-state { font-size:13px; color:#c2bcb1; text-align:center; padding:2rem 1rem; font-style:italic; }
+.ask-loading { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft); padding:0.5rem 0; }
+.mini-spin { width:16px; height:16px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--maroon); animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Guided filter block on browse pages ──────────────────────────────── */
+.guide-box { background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:10px; }
+.search-bar { display:flex; align-items:center; gap:8px; background:#faf8f4; border:1.5px solid var(--line-soft); border-radius:11px; padding:9px 12px; }
+.search-bar i { color:#b6ada0; }
+.search-bar input { flex:1; border:none; outline:none; font-size:13.5px; font-family:inherit; background:transparent; }
+.results-count { font-size:12px; color:var(--ink-soft); padding:0 2px; }
+
+/* ── Cards: shared ───────────────────────────────────────────────────── */
+.card { background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:9px; }
+.card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.card-title-lg { font-size:15px; font-weight:800; color:var(--ink); }
+.card-subtitle { font-size:12.5px; color:var(--maroon); font-weight:600; margin-top:2px; }
+.rating-pill { display:flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:#b5790a; background:#fdf3e2; border-radius:100px; padding:4px 9px; flex-shrink:0; white-space:nowrap; }
+.meta-grid { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--ink-soft); }
+.meta-grid b { color:var(--ink); font-weight:600; }
+.tag-row { display:flex; flex-wrap:wrap; gap:6px; }
+.tag { font-size:11px; background:var(--blush); color:var(--maroon); border:1px solid var(--blush-line); border-radius:100px; padding:3px 9px; }
+.card-btn { align-self:flex-start; padding:9px 18px; background:var(--maroon); color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; transition:background .15s; margin-top:2px; }
+.card-btn:hover { background:var(--maroon-dark); }
+.card-btn.secondary { background:#fff; color:var(--maroon); border:1.5px solid var(--maroon); }
+.card-btn.secondary:hover { background:var(--blush); }
+
+/* ── Certification card detail rows ──────────────────────────────────── */
+.cert-row { font-size:12.5px; color:#555; }
+.cert-row b { color:var(--ink); display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#a39a8c; margin-bottom:3px; }
+.cert-cost { font-size:14px; font-weight:800; color:var(--maroon); }
+
+/* ── Collaboration card ─────────────────────────────────────────────── */
+.collab-flow { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; }
+.collab-flow i { color:var(--ink-soft); font-size:16px; }
+
+/* ── Community card ──────────────────────────────────────────────────── */
+.community-stats { display:flex; gap:16px; }
+.stat { display:flex; flex-direction:column; }
+.stat-num { font-size:16px; font-weight:800; color:var(--ink); }
+.stat-label { font-size:10.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; }
+
+/* ── Popup / toast ───────────────────────────────────────────────────── */
+.popup-overlay { position:fixed; inset:0; background:rgba(20,15,10,0.32); z-index:50; display:none; align-items:center; justify-content:center; padding:1.25rem; }
+.popup-overlay.show { display:flex; }
+.popup-card { background:#fff; border-radius:16px; padding:1.6rem 1.4rem; max-width:340px; width:100%; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 20px 50px rgba(0,0,0,0.18); }
+.popup-icon { width:52px; height:52px; border-radius:50%; background:#e6f7f0; color:var(--green); display:flex; align-items:center; justify-content:center; font-size:26px; }
+.popup-text { font-size:14px; color:var(--ink); line-height:1.5; }
+.popup-close { margin-top:6px; padding:10px 26px; background:var(--maroon); color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; }
+
+/* ── Smart Introduction modal ────────────────────────────────────────── */
+.modal-card { background:#fff; border-radius:16px; padding:1.4rem; max-width:420px; width:100%; display:flex; flex-direction:column; gap:12px; box-shadow:0 20px 50px rgba(0,0,0,0.18); }
+.modal-title { font-size:15px; font-weight:800; }
+.modal-field label { font-size:11.5px; font-weight:700; color:#a39a8c; text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:4px; }
+.modal-field input, .modal-field textarea { width:100%; border:1.5px solid var(--line); border-radius:9px; padding:9px 11px; font-family:inherit; font-size:13.5px; outline:none; }
+.modal-field input:focus, .modal-field textarea:focus { border-color:var(--maroon); }
+.modal-field textarea { resize:none; min-height:80px; }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+.modal-btn { padding:10px 20px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; border:none; }
+.modal-btn.cancel { background:#f4f0ea; color:#777; }
+.modal-btn.cancel:hover { background:#ece7de; }
+.modal-btn.send { background:var(--maroon); color:#fff; }
+.modal-btn.send:hover { background:var(--maroon-dark); }
+
+@media (max-width: 480px) {
+  .card-head { flex-direction:column; }
+  .nav-square.wide { flex-direction:column; align-items:flex-start; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-back hidden" id="topbar-back" onclick="goHome()"><i class="ti ti-arrow-left"></i> Back</div>
+  <div class="topbar-brand" id="topbar-brand" onclick="goHome()"><i class="ti ti-users-group"></i> Connect Buddy</div>
+  <div class="topbar-spacer"></div>
+</div>
+
+<div class="main-scroll">
+
+  <!-- LANDING / HOME -->
+  <section class="view active" id="view-landing">
+    <div>
+      <div class="landing-heading">What do you want to do?</div>
+      <div class="landing-sub">Get help from real people — ask a question, find an expert, check a certification, team up with another artisan, or join a local community.</div>
+    </div>
+    <div class="nav-grid">
+      <div class="nav-square wide" onclick="switchTab('ask')">
+        <i class="ti ti-message-circle-2 nav-icon"></i>
+        <div class="nav-square-text">
+          <div class="nav-square-label">Ask Connect Buddy</div>
+          <div class="nav-square-sub">Describe your problem in your own words — I'll figure out who or what can help.</div>
+        </div>
+      </div>
+      <div class="nav-square" onclick="switchTab('experts')">
+        <i class="ti ti-user-star nav-icon"></i>
+        <div>
+          <div class="nav-square-label">Experts</div>
+          <div class="nav-square-sub">Find people for pricing, photography, exports, marketing & more.</div>
+        </div>
+      </div>
+      <div class="nav-square" onclick="switchTab('certs')">
+        <i class="ti ti-certificate nav-icon"></i>
+        <div>
+          <div class="nav-square-label">Certifications</div>
+          <div class="nav-square-sub">FSSAI, GI Tag, GST & other registrations — what you need, in plain terms.</div>
+        </div>
+      </div>
+      <div class="nav-square" onclick="switchTab('collab')">
+        <i class="ti ti-plug-connected nav-icon"></i>
+        <div>
+          <div class="nav-square-label">Collaborate</div>
+          <div class="nav-square-sub">Pair up with a complementary craftsperson to grow together.</div>
+        </div>
+      </div>
+      <div class="nav-square" onclick="switchTab('communities')">
+        <i class="ti ti-building-community nav-icon"></i>
+        <div>
+          <div class="nav-square-label">Communities</div>
+          <div class="nav-square-sub">Join local artisan groups near you, in your own language.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASK -->
+  <section class="view" id="view-ask">
+    <div>
+      <div class="page-heading">Ask Connect Buddy</div>
+      <div class="page-sub">Type any question about pricing help, certifications, exports, packaging, or finding people to work with. I'll match it to the right person or resource.</div>
+    </div>
+    <div class="ask-box">
+      <div class="ask-row">
+        <textarea id="ask-inp" placeholder="e.g. Do I need FSSAI to sell my homemade pickles?" oninput="autosize(this)" onkeydown="handleAskKey(event)"></textarea>
+        <button class="ask-send" id="ask-send-btn" onclick="submitAsk()"><i class="ti ti-send"></i></button>
+      </div>
+      <div class="chip-row-label">Try one of these</div>
+      <div class="ask-examples">
+        <span class="ask-chip" onclick="fillAsk('Do I need FSSAI to sell my homemade pickles?')">FSSAI for pickles?</span>
+        <span class="ask-chip" onclick="fillAsk('I make candles, who can help with packaging?')">Packaging for candles</span>
+        <span class="ask-chip" onclick="fillAsk('How do I get a GI tag for my weaving?')">GI tag for weaving</span>
+        <span class="ask-chip" onclick="fillAsk('Are there other sellers near me I can talk to?')">Local sellers nearby</span>
+        <span class="ask-chip" onclick="fillAsk('How should I price my handmade jewellery?')">Pricing my jewellery</span>
+        <span class="ask-chip" onclick="fillAsk('I want to sell my products outside India, what do I need?')">Selling internationally</span>
+      </div>
+    </div>
+    <div id="ask-results"></div>
+  </section>
+
+  <!-- EXPERTS -->
+  <section class="view" id="view-experts">
+    <div>
+      <div class="page-heading">Find an expert</div>
+      <div class="page-sub">Tap what you need help with, or search directly — for pricing, photography, marketing, certifications, exports and more.</div>
+    </div>
+    <div class="guide-box">
+      <div class="chip-row-label">What do you need help with?</div>
+      <div class="chip-row" id="experts-chip-row"></div>
+      <div class="search-bar"><i class="ti ti-search"></i><input id="search-experts" oninput="onExpertSearchInput()" placeholder="Or search by specialty, name, or language…"/></div>
+    </div>
+    <div class="results-count" id="experts-count"></div>
+    <div id="experts-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- CERTIFICATIONS -->
+  <section class="view" id="view-certs">
+    <div>
+      <div class="page-heading">Certification guidance</div>
+      <div class="page-sub">Not sure which registration applies to you? Tap your situation below, or search a certification by name.</div>
+    </div>
+    <div class="guide-box">
+      <div class="chip-row-label">What's your situation?</div>
+      <div class="chip-row" id="certs-chip-row"></div>
+      <div class="search-bar"><i class="ti ti-search"></i><input id="search-certs" oninput="onCertSearchInput()" placeholder="Or search FSSAI, GI Tag, GST…"/></div>
+    </div>
+    <div class="results-count" id="certs-count"></div>
+    <div id="certs-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- COLLABORATE -->
+  <section class="view" id="view-collab">
+    <div>
+      <div class="page-heading">Collaborate with someone</div>
+      <div class="page-sub">Tap your craft to see who could complement it — or search directly for a profession.</div>
+    </div>
+    <div class="guide-box">
+      <div class="chip-row-label">What do you make?</div>
+      <div class="chip-row" id="collab-chip-row"></div>
+      <div class="search-bar"><i class="ti ti-search"></i><input id="search-collab" oninput="onCollabSearchInput()" placeholder="Or search by craft or profession…"/></div>
+    </div>
+    <div class="results-count" id="collab-count"></div>
+    <div id="collab-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- COMMUNITIES -->
+  <section class="view" id="view-communities">
+    <div>
+      <div class="page-heading">Join a community</div>
+      <div class="page-sub">Tap a region to see local groups, or search by city or language.</div>
+    </div>
+    <div class="guide-box">
+      <div class="chip-row-label">Browse by region</div>
+      <div class="chip-row" id="communities-chip-row"></div>
+      <div class="search-bar"><i class="ti ti-search"></i><input id="search-communities" oninput="onCommunitySearchInput()" placeholder="Or search by city, name, or language…"/></div>
+    </div>
+    <div class="results-count" id="communities-count"></div>
+    <div id="communities-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+</div>
+
+<!-- Success popup -->
+<div class="popup-overlay" id="popup-overlay">
+  <div class="popup-card">
+    <div class="popup-icon"><i class="ti ti-check"></i></div>
+    <div class="popup-text" id="popup-text"></div>
+    <button class="popup-close" onclick="closePopup()">Done</button>
+  </div>
+</div>
+
+<!-- Smart Introduction modal -->
+<div class="popup-overlay" id="intro-overlay">
+  <div class="modal-card">
+    <div class="modal-title">Introduce yourself to <span id="intro-contact-name"></span></div>
+    <div class="modal-field">
+      <label>Your name</label>
+      <input id="intro-your-name" type="text" placeholder="e.g. Lakshmi"/>
+    </div>
+    <div class="modal-field">
+      <label>Message</label>
+      <textarea id="intro-message"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeIntroModal()">Cancel</button>
+      <button class="modal-btn send" id="intro-send-btn" onclick="sendIntroduction()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8080"
+    : "https://artisan-price-buddy.onrender.com";
+
+let DATA = { experts: [], certifications: [], collaborators: [], communities: [] };
+let activeCollabId = null;
+
+/* ── Quick-filter chip definitions: label shown -> query string used to filter ── */
+const EXPERT_CHIPS = [
+  ["Pricing & profit", "pricing"],
+  ["Product photography", "photography"],
+  ["Export & compliance", "export"],
+  ["Certifications", "certification"],
+  ["Marketing & social media", "marketing"],
+  ["Packaging", "packaging"],
+  ["Marketplace setup", "marketplace"],
+  ["Logistics & shipping", "logistics"],
+];
+const CERT_CHIPS = [
+  ["I sell food or edibles", "food"],
+  ["I want to export", "export"],
+  ["I weave or make textiles", "textile"],
+  ["I want a quality/craft mark", "handicraft"],
+  ["Tax & business registration", "gst"],
+  ["I use organic/natural claims", "organic"],
+];
+const COLLAB_CHIPS = [
+  ["Candles & soap", "candle"],
+  ["Textiles & weaving", "textile"],
+  ["Jewellery", "jewellery"],
+  ["Pottery & ceramics", "pottery"],
+  ["Wood & leather", "wood"],
+  ["Food & spices", "food"],
+  ["Painting & wall art", "painting"],
+];
+const COMMUNITY_CHIPS = [
+  ["South India", "chennai coimbatore kochi hyderabad bengaluru"],
+  ["North India", "delhi lucknow amritsar bhopal"],
+  ["West India", "mumbai pune ahmedabad surat indore"],
+  ["East & Northeast", "kolkata guwahati"],
+];
+
+/* ── Tabs / navigation ───────────────────────────────────────────────── */
+function switchTab(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  document.getElementById('topbar-back').classList.toggle('hidden', name === 'landing');
+}
+function goHome() { switchTab('landing'); }
+
+/* ── Bootstrap data ──────────────────────────────────────────────────── */
+async function loadData() {
+  try {
+    const r = await fetch(API + "/connect/bootstrap");
+    DATA = await r.json();
+  } catch (e) {
+    console.error("Could not load Connect Buddy data", e);
+  }
+  buildChipRow('experts-chip-row', EXPERT_CHIPS, 'experts');
+  buildChipRow('certs-chip-row', CERT_CHIPS, 'certs');
+  buildChipRow('collab-chip-row', COLLAB_CHIPS, 'collab');
+  buildChipRow('communities-chip-row', COMMUNITY_CHIPS, 'communities');
+  renderExperts(); renderCerts(); renderCollab(); renderCommunities();
+}
+
+function autosize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
+function fillAsk(text) { document.getElementById('ask-inp').value = text; autosize(document.getElementById('ask-inp')); submitAsk(); }
+function handleAskKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitAsk(); } }
+
+/* ── Chip row builder (shared by all 4 browse pages) ──────────────────── */
+function buildChipRow(containerId, chips, tabKey) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = chips.map((c, i) => `<span class="filter-chip" data-i="${i}" onclick="applyChip('${tabKey}', ${i}, this)">${c[0]}</span>`).join("");
+}
+const CHIP_SETS = { experts: EXPERT_CHIPS, certs: CERT_CHIPS, collab: COLLAB_CHIPS, communities: COMMUNITY_CHIPS };
+const SEARCH_INPUT_ID = { experts: 'search-experts', certs: 'search-certs', collab: 'search-collab', communities: 'search-communities' };
+const RENDER_FN = { experts: renderExperts, certs: renderCerts, collab: renderCollab, communities: renderCommunities };
+const CHIP_ROW_ID = { experts: 'experts-chip-row', certs: 'certs-chip-row', collab: 'collab-chip-row', communities: 'communities-chip-row' };
+
+function applyChip(tabKey, index, el) {
+  const alreadyActive = el.classList.contains('active');
+  document.querySelectorAll(`#${CHIP_ROW_ID[tabKey]} .filter-chip`).forEach(c => c.classList.remove('active'));
+  const input = document.getElementById(SEARCH_INPUT_ID[tabKey]);
+  if (alreadyActive) {
+    input.value = "";
+  } else {
+    el.classList.add('active');
+    input.value = CHIP_SETS[tabKey][index][1];
+  }
+  RENDER_FN[tabKey]();
+}
+function clearChipHighlight(tabKey) {
+  document.querySelectorAll(`#${CHIP_ROW_ID[tabKey]} .filter-chip`).forEach(c => c.classList.remove('active'));
+}
+function onExpertSearchInput() { clearChipHighlight('experts'); renderExperts(); }
+function onCertSearchInput() { clearChipHighlight('certs'); renderCerts(); }
+function onCollabSearchInput() { clearChipHighlight('collab'); renderCollab(); }
+function onCommunitySearchInput() { clearChipHighlight('communities'); renderCommunities(); }
+
+/* ── Popup helpers ───────────────────────────────────────────────────── */
+function showPopup(message) {
+  document.getElementById('popup-text').textContent = message;
+  document.getElementById('popup-overlay').classList.add('show');
+}
+function closePopup() { document.getElementById('popup-overlay').classList.remove('show'); }
+
+/* ── Card renderers (shared between Ask results and Browse tabs) ──────── */
+function expertCard(e) {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title-lg">${e.name}</div><div class="card-subtitle">${e.specialty}</div></div>
+        <div class="rating-pill"><i class="ti ti-star-filled"></i> ${e.rating}</div>
+      </div>
+      <div class="meta-grid">
+        <span><b>${e.languages.join(", ")}</b></span>
+        <span><b>${e.experience}</b> experience</span>
+        <span><b>${e.fee}</b></span>
+      </div>
+      <button class="card-btn" onclick="requestConsultation('${e.id}')">Request Consultation</button>
+    </div>`;
+}
+
+function certCard(c) {
+  return `
+    <div class="card">
+      <div class="card-title-lg">${c.name}</div>
+      <div class="cert-row">${c.why_it_matters}</div>
+      <div class="cert-row"><b>Basic requirements</b>${c.requirements.join(" · ")}</div>
+      <div class="cert-row"><b>Documents needed</b>${c.documents.join(" · ")}</div>
+      <div class="cert-cost">Est. cost: ${c.estimated_cost}</div>
+      <button class="card-btn" onclick="connectCertConsultant('${c.id}')">Connect with Consultant</button>
+    </div>`;
+}
+
+function collabCard(c) {
+  return `
+    <div class="card">
+      <div class="collab-flow">${c.from_profession} <i class="ti ti-arrow-right"></i> ${c.to_profession}</div>
+      <div class="cert-row">${c.reason}</div>
+      <div class="tag-row"><span class="tag">Contact: ${c.contact_name}</span></div>
+      <button class="card-btn" onclick="openIntroModal('${c.id}')">Introduce Us</button>
+    </div>`;
+}
+
+function communityCard(c) {
+  return `
+    <div class="card">
+      <div class="card-title-lg">${c.name}</div>
+      <div class="community-stats">
+        <div class="stat"><span class="stat-num">${c.city}</span><span class="stat-label">City</span></div>
+        <div class="stat"><span class="stat-num">${c.members}</span><span class="stat-label">Members</span></div>
+        <div class="stat"><span class="stat-num">${c.language}</span><span class="stat-label">Language</span></div>
+      </div>
+      <button class="card-btn secondary" onclick="joinCommunity('${c.id}')">Join Community</button>
+    </div>`;
+}
+
+/* ── Browse tab rendering with search / chip filter (multi-word OR match) ── */
+function matchAny(haystack, query) {
+  if (!query) return true;
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = haystack.toLowerCase();
+  return words.some(w => hay.includes(w));
+}
+
+function renderExperts() {
+  const q = (document.getElementById('search-experts')?.value || "").trim();
+  const list = DATA.experts.filter(e => matchAny(`${e.specialty} ${e.name} ${e.languages.join(" ")} ${(e.keywords||[]).join(" ")}`, q));
+  document.getElementById('experts-count').textContent = q ? `${list.length} expert${list.length===1?'':'s'} found` : `${DATA.experts.length} experts available`;
+  document.getElementById('experts-list').innerHTML = list.length ? list.map(expertCard).join("") : `<div class="ask-empty-state">No experts match that — try a different tag or search term.</div>`;
+}
+function renderCerts() {
+  const q = (document.getElementById('search-certs')?.value || "").trim();
+  const list = DATA.certifications.filter(c => matchAny(`${c.name} ${(c.keywords||[]).join(" ")}`, q));
+  document.getElementById('certs-count').textContent = q ? `${list.length} certification${list.length===1?'':'s'} found` : `${DATA.certifications.length} certifications available`;
+  document.getElementById('certs-list').innerHTML = list.length ? list.map(certCard).join("") : `<div class="ask-empty-state">No certifications match that — try a different tag or search term.</div>`;
+}
+function renderCollab() {
+  const q = (document.getElementById('search-collab')?.value || "").trim();
+  const list = DATA.collaborators.filter(c => matchAny(`${c.from_profession} ${c.to_profession} ${(c.keywords||[]).join(" ")}`, q));
+  document.getElementById('collab-count').textContent = q ? `${list.length} match${list.length===1?'':'es'} found` : `${DATA.collaborators.length} pairings available`;
+  document.getElementById('collab-list').innerHTML = list.length ? list.map(collabCard).join("") : `<div class="ask-empty-state">No collaborations match that — try a different tag or search term.</div>`;
+}
+function renderCommunities() {
+  const q = (document.getElementById('search-communities')?.value || "").trim();
+  const list = DATA.communities.filter(c => matchAny(`${c.city} ${c.name} ${c.language}`, q));
+  document.getElementById('communities-count').textContent = q ? `${list.length} communit${list.length===1?'y':'ies'} found` : `${DATA.communities.length} communities available`;
+  document.getElementById('communities-list').innerHTML = list.length ? list.map(communityCard).join("") : `<div class="ask-empty-state">No communities match that — try a different region or search term.</div>`;
+}
+
+/* ── Ask flow: classify + show matched cards ───────────────────────────── */
+let askBusy = false;
+async function submitAsk() {
+  if (askBusy) return;
+  const inp = document.getElementById('ask-inp');
+  const text = inp.value.trim();
+  if (!text) return;
+  askBusy = true;
+  document.getElementById('ask-send-btn').disabled = true;
+  const resultsEl = document.getElementById('ask-results');
+  resultsEl.innerHTML = `<div class="ask-loading"><div class="mini-spin"></div> Thinking about the best way to help…</div>`;
+
+  try {
+    const r = await fetch(API + "/connect/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await r.json();
+    renderAskResults(data);
+  } catch (e) {
+    resultsEl.innerHTML = `<div class="ask-empty-state">Couldn't reach Connect Buddy — try again in a moment.</div>`;
+  }
+  askBusy = false;
+  document.getElementById('ask-send-btn').disabled = false;
+}
+
+function renderAskResults(data) {
+  const resultsEl = document.getElementById('ask-results');
+  if (data.intent === "none" || !data.matches || !data.matches.length) {
+    resultsEl.innerHTML = `<div class="ask-empty-state">Nothing specific to surface for that one — try Experts, Certifications, Collaborate, or Communities from the home screen, or ask a more specific question.</div>`;
+    return;
+  }
+  const rendererByIntent = { expert: expertCard, certification: certCard, collaboration: collabCard, community: communityCard };
+  const labelByIntent = {
+    expert: '<i class="ti ti-user-star"></i> People who can help',
+    certification: '<i class="ti ti-certificate"></i> Relevant certifications',
+    collaboration: '<i class="ti ti-plug-connected"></i> Collaboration ideas',
+    community: '<i class="ti ti-building-community"></i> Communities to join',
+  };
+  const renderer = rendererByIntent[data.intent];
+  let html = "";
+  if (data.reason) html += `<div class="ask-result-reason">${data.reason}</div>`;
+  html += `<div class="chip-row-label">${labelByIntent[data.intent]}</div>`;
+  html += data.matches.map(renderer).join("");
+  resultsEl.innerHTML = html;
+}
+
+/* ── Action calls ────────────────────────────────────────────────────── */
+async function requestConsultation(expertId) {
+  try {
+    const r = await fetch(API + "/connect/request-consultation", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expert_id: expertId })
+    });
+    const data = await r.json();
+    showPopup(data.message || "Request sent!");
+  } catch (e) { showPopup("Couldn't reach the server — try again."); }
+}
+
+async function connectCertConsultant(certId) {
+  try {
+    const r = await fetch(API + "/connect/connect-certification-consultant", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ certification_id: certId })
+    });
+    const data = await r.json();
+    showPopup(data.message || "Request sent!");
+  } catch (e) { showPopup("Couldn't reach the server — try again."); }
+}
+
+async function joinCommunity(communityId) {
+  try {
+    const r = await fetch(API + "/connect/join-community", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ community_id: communityId })
+    });
+    const data = await r.json();
+    showPopup(data.message || "Request sent!");
+  } catch (e) { showPopup("Couldn't reach the server — try again."); }
+}
+
+/* ── Smart Introduction modal ───────────────────────────────────────────── */
+function openIntroModal(collabId) {
+  activeCollabId = collabId;
+  const collab = DATA.collaborators.find(c => c.id === collabId);
+  if (!collab) return;
+  document.getElementById('intro-contact-name').textContent = collab.contact_name;
+  document.getElementById('intro-your-name').value = "";
+  document.getElementById('intro-message').value =
+    `Hi ${collab.contact_name},\nI'm a ${collab.from_profession.toLowerCase()} looking for a ${collab.to_profession.toLowerCase()}. ${collab.reason} Would you be interested in connecting?`;
+  document.getElementById('intro-overlay').classList.add('show');
+}
+function closeIntroModal() { document.getElementById('intro-overlay').classList.remove('show'); activeCollabId = null; }
+
+document.getElementById('intro-your-name').addEventListener('input', function() {
+  const collab = DATA.collaborators.find(c => c.id === activeCollabId);
+  if (!collab || !this.value.trim()) return;
+  const ta = document.getElementById('intro-message');
+  ta.value = `Hi ${collab.contact_name},\n${this.value.trim()} is a ${collab.from_profession.toLowerCase()} looking for a ${collab.to_profession.toLowerCase()}. ${collab.reason} Would you be interested in connecting?`;
+});
+
+async function sendIntroduction() {
+  if (!activeCollabId) return;
+  const message = document.getElementById('intro-message').value.trim();
+  document.getElementById('intro-send-btn').disabled = true;
+  try {
+    const r = await fetch(API + "/connect/send-introduction", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collaborator_id: activeCollabId, message })
+    });
+    const data = await r.json();
+    closeIntroModal();
+    showPopup(data.message || "Introduction sent!");
+  } catch (e) {
+    showPopup("Couldn't reach the server — try again.");
+  }
+  document.getElementById('intro-send-btn').disabled = false;
+}
+
+loadData();
+</script>
+</body>
+</html>
