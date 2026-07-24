@@ -2,7 +2,7 @@
 
 > AI-powered pricing, listing, and market insight assistant for artisans.
 
-Artisan Buddy helps artisans estimate fair selling prices using AI reasoning, semantic search, and real marketplace data. It reviews product photos and provides actionable design feedback, surfaces market and opportunity insights for new product ideas, and connects the whole workflow together before products are listed for sale.
+Artisan Buddy helps artisans estimate fair selling prices using AI reasoning, semantic search, and real marketplace data. It reviews product photos and provides actionable design feedback, surfaces market and opportunity insights for new product ideas, and connects artisans with experts, certifications, collaborators, and local communities.
 
 <p align="center">
   <img src="images/homepage.png" width="46%">
@@ -59,15 +59,15 @@ Artisan Buddy helps artisans estimate fair selling prices using AI reasoning, se
 
 ### Connect
 
+- AI-classified "Ask Connect Buddy" search — describe a problem in plain language and it's matched to the right resource type (expert, certification, collaboration, or community)
+- **Experts** — browse or filter consultants for pricing, photography, exports, marketing, packaging, marketplace setup, and logistics; request a consultation directly
+- **Certifications** — plain-language guidance on registrations like FSSAI, GI Tag, and GST, with requirements, documents needed, and estimated cost; connect with a consultant
+- **Collaborate** — matches complementary artisans (e.g. a candle maker with a packaging specialist) and sends a smart, pre-filled introduction message
+- **Communities** — find and join local artisan groups by region, city, or language
+
 <p align="center">
   <img src="images/connect.png" width="65%">
 </p>
-
-<!--
-  Note: add a line or two here describing what "Connect" does — I don't have
-  details on this feature beyond the screenshot filename, so I've left it as
-  a placeholder. Happy to write the description once you tell me what it covers.
--->
 
 ---
 
@@ -160,6 +160,12 @@ API Docs → `http://localhost:8080/docs`
 | POST | `/design-analyze` | Product image analysis |
 | POST | `/business-buddy/analyze` | Market and opportunity insights from a product description |
 | POST | `/business-buddy/analyze-image` | Market and opportunity insights from a product photo |
+| GET | `/connect/bootstrap` | Load experts, certifications, collaborators, and communities |
+| POST | `/connect/analyze` | Classify a free-text question and match it to experts, certifications, collaborations, or communities |
+| POST | `/connect/request-consultation` | Request a consultation with an expert |
+| POST | `/connect/connect-certification-consultant` | Connect with a certification consultant |
+| POST | `/connect/join-community` | Join a local artisan community |
+| POST | `/connect/send-introduction` | Send an introduction message to a potential collaborator |
 | POST | `/market-index/build` | Rebuild marketplace knowledge base |
 | GET | `/history` | Retrieve previous sessions |
 | GET | `/health` | Health check |
